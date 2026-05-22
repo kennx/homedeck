@@ -9,12 +9,12 @@ constexpr const char* kWifiSsidKey = "wifi_ssid";
 constexpr const char* kWifiPasswordKey = "wifi_password";
 constexpr const char* kTimezoneKey = "timezone";
 constexpr const char* kNtpServerKey = "ntp_server";
-constexpr const char* kPersonalCalendarUrlKey = "personal_calendar_url";
-constexpr const char* kHolidayCalendarUrlKey = "holiday_calendar_url";
-constexpr const char* kPersonalCachePayloadKey = "personal_cache_payload";
-constexpr const char* kPersonalCacheUpdatedAtKey = "personal_cache_updated_at";
-constexpr const char* kHolidayCachePayloadKey = "holiday_cache_payload";
-constexpr const char* kHolidayCacheUpdatedAtKey = "holiday_cache_updated_at";
+constexpr const char* kPersonalCalendarUrlKey = "pers_cal_url";
+constexpr const char* kHolidayCalendarUrlKey = "holi_cal_url";
+constexpr const char* kPersonalCachePayloadKey = "pers_cal_payld";
+constexpr const char* kPersonalCacheUpdatedAtKey = "pers_cal_updt";
+constexpr const char* kHolidayCachePayloadKey = "holi_cal_payld";
+constexpr const char* kHolidayCacheUpdatedAtKey = "holi_cal_updt";
 
 String toArduinoString(const std::string& value) {
   return String(value.c_str());

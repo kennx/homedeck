@@ -19,6 +19,7 @@ inline const int efontCN_14 = 0;
 enum class FakeFontKind {
   kDefault = 0,
   kChinese = 1,
+  kDeviceDefault = 2,
 };
 
 namespace m5 {
@@ -145,6 +146,7 @@ struct FakeDisplay {
   int widthPixels = 400;
   int heightPixels = 600;
   bool textWrap = true;
+  bool loadFontSucceeds = true;
   std::uint32_t textColor = TFT_BLACK;
   std::uint32_t textBackground = TFT_WHITE;
   std::uint32_t fillScreenColor = TFT_WHITE;
@@ -152,7 +154,7 @@ struct FakeDisplay {
   std::vector<FakeRect> rects;
 
   static int lineHeightFor(FakeFontKind kind) {
-    return kind == FakeFontKind::kChinese ? 14 : 8;
+    return kind == FakeFontKind::kDefault ? 8 : 14;
   }
 
   void setRotation(int value) {
@@ -234,11 +236,23 @@ struct FakeDisplay {
       return 8;
     }
 
+    if (kind == FakeFontKind::kDeviceDefault) {
+      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 7 : 14;
+    }
+
     if (leadByte < 0x80 || (leadByte & 0xE0) == 0xC0) {
       return 9;
     }
 
     return 12;
+  }
+
+  bool loadFont(const std::uint8_t*) {
+    if (!loadFontSucceeds) {
+      return false;
+    }
+    fontKind = FakeFontKind::kDeviceDefault;
+    return true;
   }
 
   int textWidth(const char* text) const {
@@ -343,6 +357,14 @@ struct FakeCanvas {
     if (parent != nullptr) {
       parent->fontKind = fontKind;
     }
+  }
+
+  bool loadFont(const std::uint8_t* font) {
+    if (parent == nullptr || !parent->loadFont(font)) {
+      return false;
+    }
+    fontKind = FakeFontKind::kDeviceDefault;
+    return true;
   }
 
   void setCursor(int x, int y) {

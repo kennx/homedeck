@@ -13,8 +13,9 @@ namespace {
 constexpr int kLeft = 20;
 constexpr int kTop = 20;
 constexpr int kTextSize = 2;
-constexpr int kNormalLineHeight = 24;
-constexpr int kMixedLineHeight = 28;
+constexpr int kNormalLineHeight = 40;
+constexpr int kValueLineHeight = 40;
+constexpr int kMixedLineHeight = 40;
 constexpr int kQrTopGap = 8;
 
 void drawQrCode(M5Canvas& canvas, const std::string& payload, int originY) {
@@ -68,7 +69,7 @@ void SetupRenderer::render(const char* apSsid, const char* ipText) {
 
   canvas.setCursor(kLeft, y);
   canvas.print(apSsid);
-  y += 20;
+  y += kValueLineHeight;
 
   canvas.setCursor(kLeft, y);
   canvas.print("2. 打开 ");

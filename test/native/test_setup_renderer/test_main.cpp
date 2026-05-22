@@ -33,8 +33,16 @@ int renderedWidth(const FakePrintedText& entry) {
   return width;
 }
 
+int realisticLineHeightFor(const FakePrintedText& entry) {
+  if (entry.fontKind == FakeFontKind::kDeviceDefault) {
+    return 20 * entry.size;
+  }
+
+  return FakeDisplay::lineHeightFor(entry.fontKind) * entry.size;
+}
+
 int bottomEdgeOf(const FakePrintedText& entry) {
-  return entry.y + FakeDisplay::lineHeightFor(entry.fontKind) * entry.size;
+  return entry.y + realisticLineHeightFor(entry);
 }
 
 void resetFakes() {
@@ -135,12 +143,20 @@ void test_render_keeps_text_above_qr_code_region() {
   SetupRenderer renderer;
   renderer.render("HomeDeck Setup", "10.0.0.23");
 
+  const FakePrintedText* title = findPrintedText("HomeDeck 配网");
+  TEST_ASSERT_NOT_NULL(title);
+
+  const FakePrintedText* step1 = findPrintedText("1. 连接开放热点");
+  TEST_ASSERT_NOT_NULL(step1);
+
+  const FakePrintedText* ssid = findPrintedText("HomeDeck Setup");
+  TEST_ASSERT_NOT_NULL(ssid);
+
   const FakePrintedText* step2Label = findPrintedText("2. 打开 ");
   TEST_ASSERT_NOT_NULL(step2Label);
 
   const FakePrintedText* ipLabel = findPrintedText("当前热点 IP: ");
   TEST_ASSERT_NOT_NULL(ipLabel);
-  TEST_ASSERT_EQUAL_INT(28, ipLabel->y - step2Label->y);
 
   const FakePrintedText* step2Address = findPrintedTextAtY("10.0.0.23", step2Label->y);
   TEST_ASSERT_NOT_NULL(step2Address);
@@ -157,7 +173,10 @@ void test_render_keeps_text_above_qr_code_region() {
   const FakeRect* qrRegion = findLargestRect();
   TEST_ASSERT_NOT_NULL(qrRegion);
 
-  TEST_ASSERT_TRUE(std::max(bottomEdgeOf(*step2Label), bottomEdgeOf(*step2Address)) <= qrRegion->y);
+  TEST_ASSERT_TRUE(bottomEdgeOf(*title) <= step1->y);
+  TEST_ASSERT_TRUE(bottomEdgeOf(*step1) <= ssid->y);
+  TEST_ASSERT_TRUE(bottomEdgeOf(*ssid) <= step2Label->y);
+  TEST_ASSERT_TRUE(std::max(bottomEdgeOf(*step2Label), bottomEdgeOf(*step2Address)) <= ipLabel->y);
   TEST_ASSERT_TRUE(std::max(bottomEdgeOf(*lastLineLabel), bottomEdgeOf(*lastLine)) <= qrRegion->y);
 }
 

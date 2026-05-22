@@ -134,8 +134,7 @@ def run_encoder() -> None:
 
 def write_header(vlw_size: int, glyph_count: int) -> None:
     HEADER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    HEADER_PATH.write_text(
-        f"""#pragma once
+    content = f"""#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -148,10 +147,9 @@ inline constexpr std::uint32_t kDeviceFontGlyphCount = {glyph_count}U;
 inline constexpr std::uint32_t kDeviceFontPixelSize = {PIXEL_SIZE}U;
 
 }}  // namespace homedeck::generated
-""",
-        encoding="utf-8",
-        newline="\n",
-    )
+"""
+    with HEADER_PATH.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(content)
 
 
 def format_byte_array(data: bytes) -> str:
@@ -165,8 +163,7 @@ def format_byte_array(data: bytes) -> str:
 
 def write_source(vlw_data: bytes) -> None:
     SOURCE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SOURCE_PATH.write_text(
-        f"""#include "device_font_vlw.h"
+    content = f"""#include "device_font_vlw.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
@@ -186,10 +183,9 @@ static_assert(sizeof(kDeviceFontVlw) == kDeviceFontVlwSize,
               "device font VLW size metadata mismatch");
 
 }}  // namespace homedeck::generated
-""",
-        encoding="utf-8",
-        newline="\n",
-    )
+"""
+    with SOURCE_PATH.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(content)
 
 
 def main() -> None:

@@ -26,9 +26,9 @@ constexpr int kEventRowHeight = 32;
 constexpr int kEventTimeWidth = 92;
 constexpr int kEventFooterY = 528;
 constexpr int kStatusY = 566;
-constexpr int kBodyTextSize = 2;
-constexpr int kMetricValueTextSize = 3;
-constexpr int kTimeTextSize = 5;
+constexpr int kBodyTextSize = 1;
+constexpr int kMetricValueTextSize = 2;
+constexpr int kTimeTextSize = 3;
 
 void trimLastUtf8CodePoint(std::string* text) {
   if (text == nullptr || text->empty()) {

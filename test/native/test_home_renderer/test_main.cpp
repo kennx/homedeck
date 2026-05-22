@@ -57,6 +57,23 @@ int rightEdgeOf(const FakePrintedText& entry) {
   return entry.x + renderedWidth(entry);
 }
 
+int realisticLineHeightFor(const FakePrintedText& entry) {
+  if (entry.fontKind == FakeFontKind::kDeviceDefault) {
+    return 20 * entry.size;
+  }
+
+  return FakeDisplay::lineHeightFor(entry.fontKind) * entry.size;
+}
+
+int bottomEdgeOf(const FakePrintedText& entry) {
+  return entry.y + realisticLineHeightFor(entry);
+}
+
+void assertPrintWithinScreen(const FakePrintedText& entry) {
+  TEST_ASSERT_LESS_OR_EQUAL_INT(M5.Display.width() - 20, rightEdgeOf(entry));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(M5.Display.height(), bottomEdgeOf(entry));
+}
+
 void assertPrintedFont(const std::string& text, FakeFontKind expected) {
   const FakePrintedText* entry = findPrintedText(text);
   TEST_ASSERT_NOT_NULL(entry);
@@ -134,7 +151,7 @@ void test_render_truncates_holiday_text_using_device_font_metrics() {
   model.dateText = "2026年5月21日 星期四";
   model.lunarText = "农历 四月初五";
   model.solarTermText = "节气 小满";
-  model.holidayText = "一二三四五六七八九十一二三四五六七八九十";
+  model.holidayText = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十";
   model.temperatureText = "23.7°C";
   model.humidityText = "56%";
   model.wifiConnected = true;
@@ -186,7 +203,7 @@ void test_render_uses_device_default_font_for_all_text_fields() {
   assertPrintedFont("开晨会", FakeFontKind::kDeviceDefault);
 }
 
-void test_render_draws_temperature_value_with_device_default_font() {
+void test_render_keeps_home_sections_separated_with_device_font_height() {
   resetFakes();
 
   homedeck::HomeViewModel model;
@@ -207,12 +224,80 @@ void test_render_draws_temperature_value_with_device_default_font() {
   HomeRenderer renderer;
   renderer.render(model);
 
-  const FakePrintedText* temperature = findPrintedText("23.7°C");
+  const FakePrintedText* time = findPrintedText("09:30");
+  const FakePrintedText* date = findPrintedText("2026年5月21日 星期四");
+  const FakePrintedText* lunar = findPrintedText("农历 四月初五");
+  const FakePrintedText* solarTerm = findPrintedText("节气 小满");
+  const FakePrintedText* holiday = findPrintedText("节假日 无");
+  const FakePrintedText* temperatureLabel = findPrintedText(32, 256);
+  const FakePrintedText* temperatureValue = findPrintedText(32, 288);
+  const FakePrintedText* humidityLabel = findPrintedText(222, 256);
+  const FakePrintedText* humidityValue = findPrintedText(222, 288);
+  const FakePrintedText* eventsTitle = findPrintedText("今日日程");
+  const FakePrintedText* eventTime = findPrintedText(20, 396);
+  const FakePrintedText* eventTitle = findPrintedText(112, 396);
+  const FakePrintedText* status = findPrintedText(20, 566);
+
+  TEST_ASSERT_NOT_NULL(time);
+  TEST_ASSERT_NOT_NULL(date);
+  TEST_ASSERT_NOT_NULL(lunar);
+  TEST_ASSERT_NOT_NULL(solarTerm);
+  TEST_ASSERT_NOT_NULL(holiday);
+  TEST_ASSERT_NOT_NULL(temperatureLabel);
+  TEST_ASSERT_NOT_NULL(temperatureValue);
+  TEST_ASSERT_NOT_NULL(humidityLabel);
+  TEST_ASSERT_NOT_NULL(humidityValue);
+  TEST_ASSERT_NOT_NULL(eventsTitle);
+  TEST_ASSERT_NOT_NULL(eventTime);
+  TEST_ASSERT_NOT_NULL(eventTitle);
+  TEST_ASSERT_NOT_NULL(status);
+
+  TEST_ASSERT_LESS_OR_EQUAL_INT(date->y, bottomEdgeOf(*time));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(lunar->y, bottomEdgeOf(*date));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(solarTerm->y, bottomEdgeOf(*lunar));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(holiday->y, bottomEdgeOf(*solarTerm));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(244, bottomEdgeOf(*holiday));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(244 + 92, bottomEdgeOf(*temperatureLabel));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(244 + 92, bottomEdgeOf(*temperatureValue));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(244 + 92, bottomEdgeOf(*humidityLabel));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(244 + 92, bottomEdgeOf(*humidityValue));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(eventTime->y, bottomEdgeOf(*eventsTitle));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(528, bottomEdgeOf(*eventTime));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(528, bottomEdgeOf(*eventTitle));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(600, bottomEdgeOf(*status));
+
+  for (const auto& entry : M5.Display.prints) {
+    assertPrintWithinScreen(entry);
+  }
+}
+
+void test_render_draws_temperature_value_with_device_default_font() {
+  resetFakes();
+
+  homedeck::HomeViewModel model;
+  model.timeText = "09:30";
+  model.dateText = "2026年5月21日 星期四";
+  model.lunarText = "农历 四月初五";
+  model.solarTermText = "节气 小满";
+  model.holidayText = "节假日 无";
+  model.temperatureText = "130.0°C";
+  model.humidityText = "56%";
+  model.wifiConnected = true;
+  model.timeSynced = true;
+  model.calendarFresh = true;
+  model.sensorAvailable = true;
+  model.eventRows[0] = {"09:00", "开晨会"};
+  model.eventCount = 1;
+
+  HomeRenderer renderer;
+  renderer.render(model);
+
+  const FakePrintedText* temperature = findPrintedText("130.0°C");
   TEST_ASSERT_NOT_NULL(temperature);
   TEST_ASSERT_EQUAL_INT(
       static_cast<int>(FakeFontKind::kDeviceDefault),
       static_cast<int>(temperature->fontKind));
-  TEST_ASSERT_LESS_OR_EQUAL_INT(32 + 146, rightEdgeOf(*temperature));
+  TEST_ASSERT_LESS_OR_EQUAL_INT(20 + 170, rightEdgeOf(*temperature));
 }
 
 int main() {
@@ -221,6 +306,7 @@ int main() {
   RUN_TEST(test_render_fits_long_holiday_and_event_text_within_screen);
   RUN_TEST(test_render_truncates_holiday_text_using_device_font_metrics);
   RUN_TEST(test_render_uses_device_default_font_for_all_text_fields);
+  RUN_TEST(test_render_keeps_home_sections_separated_with_device_font_height);
   RUN_TEST(test_render_draws_temperature_value_with_device_default_font);
   return UNITY_END();
 }

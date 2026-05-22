@@ -25,12 +25,12 @@ std::string toStdString(const String& value) {
 }
 
 bool saveStringValue(Preferences& prefs, const char* key, const String& value) {
-  const size_t written = prefs.putString(key, value);
-  if (!value.isEmpty()) {
-    return written == value.length();
+  if (value.isEmpty()) {
+    prefs.remove(key);
+    return true;
   }
-
-  return prefs.getString(key, String("__homedeck_missing__")) == value;
+  const size_t written = prefs.putString(key, value);
+  return written == value.length();
 }
 
 }  // namespace

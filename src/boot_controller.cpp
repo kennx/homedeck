@@ -85,7 +85,16 @@ BootControllerDeps makeDefaultBootControllerDeps() {
       return false;
     }
 
-    WiFi.mode(WIFI_STA);
+    wifi_mode_t currentMode = WiFi.getMode();
+    if (currentMode == WIFI_AP || currentMode == WIFI_AP_STA) {
+      WiFi.mode(WIFI_AP_STA);
+    } else {
+      WiFi.mode(WIFI_STA);
+    }
+
+    WiFi.disconnect(false, true);
+    delay(100);
+
     WiFi.begin(ssid.c_str(), password.c_str());
     for (int attempt = 0; attempt < 40; ++attempt) {
       if (WiFi.status() == WL_CONNECTED) {

@@ -105,6 +105,7 @@ void HomeRenderer::render(const homedeck::HomeViewModel& model) {
   canvas.createSprite(M5.Display.width(), M5.Display.height());
   canvas.fillSprite(TFT_WHITE);
   canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+  canvas.setFont(&fonts::efontCN_14);
   canvas.setTextWrap(false);
 
   const int pageWidth = canvas.width();

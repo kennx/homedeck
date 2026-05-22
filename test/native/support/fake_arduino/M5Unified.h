@@ -12,6 +12,10 @@
 constexpr std::uint32_t TFT_BLACK = 0x00000000u;
 constexpr std::uint32_t TFT_WHITE = 0x00FFFFFFu;
 
+namespace fonts {
+inline const int efontCN_14 = 0;
+}  // namespace fonts
+
 namespace m5 {
 
 struct rtc_time_t {
@@ -173,6 +177,9 @@ struct FakeDisplay {
     textSize = value;
   }
 
+  void setFont(const void*) {
+  }
+
   void setCursor(int x, int y) {
     cursorX = x;
     cursorY = y;
@@ -269,6 +276,9 @@ struct FakeCanvas {
     if (parent != nullptr) {
       parent->textSize = value;
     }
+  }
+
+  void setFont(const void*) {
   }
 
   void setCursor(int x, int y) {

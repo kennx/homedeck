@@ -43,6 +43,7 @@ void SetupRenderer::render(const char* apSsid, const char* ipText) {
   canvas.createSprite(M5.Display.width(), M5.Display.height());
   canvas.fillSprite(TFT_WHITE);
   canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+  canvas.setFont(&fonts::efontCN_14);
   canvas.setTextSize(2);
   canvas.setCursor(20, 20);
   canvas.println("HomeDeck 配网");

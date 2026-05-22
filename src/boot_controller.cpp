@@ -10,7 +10,6 @@
 
 #if !defined(UNIT_TEST)
 #include <Arduino.h>
-#include <ESP.h>
 #include <M5Unified.h>
 #include <WiFi.h>
 
@@ -236,6 +235,15 @@ void BootController::update() {
 
   if (deps_.m5Update) {
     deps_.m5Update();
+  }
+
+  if (!accessPointMode_ && deps_.areSetupButtonsPressed && deps_.areSetupButtonsPressed()) {
+    if (deps_.saveSetupConfig) {
+      deps_.saveSetupConfig(homedeck::SetupConfig{});
+    }
+#if !defined(UNIT_TEST)
+    ESP.restart();
+#endif
   }
 
   if (accessPointMode_) {

@@ -20,6 +20,8 @@ enum class FakeFontKind {
   kDefault = 0,
   kChinese = 1,
   kDeviceDefault = 2,
+  kDeviceMetric = 3,
+  kDeviceTime = 4,
 };
 
 namespace m5 {
@@ -154,7 +156,16 @@ struct FakeDisplay {
   std::vector<FakeRect> rects;
 
   static int lineHeightFor(FakeFontKind kind) {
-    return kind == FakeFontKind::kDefault ? 8 : 14;
+    if (kind == FakeFontKind::kDefault) {
+      return 8;
+    }
+    if (kind == FakeFontKind::kDeviceMetric) {
+      return 28;
+    }
+    if (kind == FakeFontKind::kDeviceTime) {
+      return 42;
+    }
+    return 14;
   }
 
   void setRotation(int value) {
@@ -240,6 +251,14 @@ struct FakeDisplay {
       return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 7 : 14;
     }
 
+    if (kind == FakeFontKind::kDeviceMetric) {
+      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 14 : 28;
+    }
+
+    if (kind == FakeFontKind::kDeviceTime) {
+      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 21 : 42;
+    }
+
     if (leadByte < 0x80 || (leadByte & 0xE0) == 0xC0) {
       return 9;
     }
@@ -247,12 +266,20 @@ struct FakeDisplay {
     return 12;
   }
 
-  bool loadFont(const std::uint8_t*) {
+  bool loadFont(const std::uint8_t* font) {
     if (!loadFontSucceeds) {
       fontKind = FakeFontKind::kDefault;
       return false;
     }
-    fontKind = FakeFontKind::kDeviceDefault;
+    if (font == nullptr) {
+      fontKind = FakeFontKind::kDefault;
+    } else if (font[0] == 28) {
+      fontKind = FakeFontKind::kDeviceMetric;
+    } else if (font[0] == 42) {
+      fontKind = FakeFontKind::kDeviceTime;
+    } else {
+      fontKind = FakeFontKind::kDeviceDefault;
+    }
     return true;
   }
 
@@ -365,7 +392,7 @@ struct FakeCanvas {
       fontKind = FakeFontKind::kDefault;
       return false;
     }
-    fontKind = FakeFontKind::kDeviceDefault;
+    fontKind = parent->fontKind;
     return true;
   }
 

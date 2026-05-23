@@ -9,12 +9,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_FONT = ROOT / "fonts" / "NotoSansSC-Regular.ttf"
-PIXEL_SIZE = 14
+BODY_PIXEL_SIZE = 14
+METRIC_PIXEL_SIZE = 28
+TIME_PIXEL_SIZE = 42
 MIN_GLYPH_COUNT = 6000
 BUILD_DIR = ROOT / ".pio" / "build" / "font-tools"
-CODEPOINTS_PATH = BUILD_DIR / "device_font_codepoints.txt"
 ENCODER_PATH = BUILD_DIR / "font_to_vlw"
-VLW_PATH = BUILD_DIR / "device_font.vlw"
 HEADER_PATH = ROOT / "src" / "generated" / "device_font_vlw.h"
 SOURCE_PATH = ROOT / "src" / "generated" / "device_font_vlw.cpp"
 EXTRA_TEXT = (
@@ -22,12 +22,30 @@ EXTRA_TEXT = (
     "℃°％%年月日星期农历节气节假日今日日程温度湿度还有项连接开放热点打开当前热点配置不可用为空同步网络传感器"
     "HomeDeck Wi-Fi NTP webcal"
 )
+NUMERIC_TEXT = "0123456789:-+.°℃C% "
 SCAN_DIRS = (
     ROOT / "src",
     ROOT / "lib" / "homedeck_core" / "src",
     ROOT / "test" / "native",
 )
 SCAN_SUFFIXES = {".cpp", ".h", ".hpp", ".ino"}
+
+
+class FontResource:
+    def __init__(
+        self,
+        name: str,
+        symbol_prefix: str,
+        pixel_size: int,
+        codepoints: list[int],
+    ) -> None:
+        self.name = name
+        self.symbol_prefix = symbol_prefix
+        self.pixel_size = pixel_size
+        self.codepoints = codepoints
+        self.codepoints_path = BUILD_DIR / f"{name}_codepoints.txt"
+        self.vlw_path = BUILD_DIR / f"{name}.vlw"
+        self.vlw_data = b""
 
 
 def run(command: list[str]) -> None:
@@ -82,9 +100,9 @@ def collect_codepoints() -> list[int]:
     return sorted(codepoints)
 
 
-def write_codepoints(codepoints: list[int]) -> None:
+def write_codepoints(path: Path, codepoints: list[int]) -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    with CODEPOINTS_PATH.open("w", encoding="utf-8", newline="\n") as output:
+    with path.open("w", encoding="utf-8", newline="\n") as output:
         output.write("# HomeDeck generated device font code points.\n")
         for value in codepoints:
             output.write(f"{value:04X}\n")
@@ -120,20 +138,29 @@ def compile_encoder() -> None:
     run(command)
 
 
-def run_encoder() -> None:
+def run_encoder(resource: FontResource) -> None:
     run(
         [
             str(ENCODER_PATH),
             str(SOURCE_FONT),
-            str(CODEPOINTS_PATH),
-            str(PIXEL_SIZE),
-            str(VLW_PATH),
+            str(resource.codepoints_path),
+            str(resource.pixel_size),
+            str(resource.vlw_path),
         ]
     )
 
 
-def write_header(vlw_size: int, glyph_count: int) -> None:
+def write_header(resources: list[FontResource]) -> None:
     HEADER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    declarations = []
+    for resource in resources:
+        declarations.append(
+            f"""extern const std::uint8_t {resource.symbol_prefix}FontVlw[];
+inline constexpr std::size_t {resource.symbol_prefix}FontVlwSize = {len(resource.vlw_data)}U;
+inline constexpr std::uint32_t {resource.symbol_prefix}FontGlyphCount = {len(resource.codepoints)}U;
+inline constexpr std::uint32_t {resource.symbol_prefix}FontPixelSize = {resource.pixel_size}U;"""
+        )
+    declarations_text = "\n\n".join(declarations)
     content = f"""#pragma once
 
 #include <cstddef>
@@ -141,10 +168,7 @@ def write_header(vlw_size: int, glyph_count: int) -> None:
 
 namespace homedeck::generated {{
 
-extern const std::uint8_t kDeviceFontVlw[];
-inline constexpr std::size_t kDeviceFontVlwSize = {vlw_size}U;
-inline constexpr std::uint32_t kDeviceFontGlyphCount = {glyph_count}U;
-inline constexpr std::uint32_t kDeviceFontPixelSize = {PIXEL_SIZE}U;
+{declarations_text}
 
 }}  // namespace homedeck::generated
 """
@@ -161,8 +185,19 @@ def format_byte_array(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def write_source(vlw_data: bytes) -> None:
+def write_source(resources: list[FontResource]) -> None:
     SOURCE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    arrays = []
+    for resource in resources:
+        arrays.append(
+            f"""const std::uint8_t {resource.symbol_prefix}FontVlw[] PROGMEM = {{
+{format_byte_array(resource.vlw_data)}
+}};
+
+static_assert(sizeof({resource.symbol_prefix}FontVlw) == {resource.symbol_prefix}FontVlwSize,
+              "{resource.symbol_prefix}FontVlw size metadata mismatch");"""
+        )
+    arrays_text = "\n\n".join(arrays)
     content = f"""#include "device_font_vlw.h"
 
 #if defined(ARDUINO)
@@ -175,12 +210,7 @@ def write_source(vlw_data: bytes) -> None:
 
 namespace homedeck::generated {{
 
-const std::uint8_t kDeviceFontVlw[] PROGMEM = {{
-{format_byte_array(vlw_data)}
-}};
-
-static_assert(sizeof(kDeviceFontVlw) == kDeviceFontVlwSize,
-              "device font VLW size metadata mismatch");
+{arrays_text}
 
 }}  // namespace homedeck::generated
 """
@@ -192,26 +222,52 @@ def main() -> None:
     if not SOURCE_FONT.exists():
         raise SystemExit(f"source font missing: {SOURCE_FONT}")
 
-    codepoints = collect_codepoints()
-    if len(codepoints) < MIN_GLYPH_COUNT:
+    body_codepoints = collect_codepoints()
+    if len(body_codepoints) < MIN_GLYPH_COUNT:
         raise SystemExit(
-            f"collected glyph set is unexpectedly small: {len(codepoints)}"
+            f"collected glyph set is unexpectedly small: {len(body_codepoints)}"
         )
 
-    write_codepoints(codepoints)
+    numeric_codepoints: set[int] = set()
+    collect_text(numeric_codepoints, NUMERIC_TEXT, non_ascii_only=False)
+    resources = [
+        FontResource("device_font", "kDevice", BODY_PIXEL_SIZE, body_codepoints),
+        FontResource(
+            "device_metric_font",
+            "kDeviceMetric",
+            METRIC_PIXEL_SIZE,
+            sorted(numeric_codepoints),
+        ),
+        FontResource(
+            "device_time_font",
+            "kDeviceTime",
+            TIME_PIXEL_SIZE,
+            sorted(numeric_codepoints),
+        ),
+    ]
+
+    for resource in resources:
+        write_codepoints(resource.codepoints_path, resource.codepoints)
+
     compile_encoder()
-    run_encoder()
 
-    vlw_data = VLW_PATH.read_bytes()
-    write_header(len(vlw_data), len(codepoints))
-    write_source(vlw_data)
+    for resource in resources:
+        run_encoder(resource)
+        resource.vlw_data = resource.vlw_path.read_bytes()
 
-    print(f"Generated {CODEPOINTS_PATH.relative_to(ROOT)}")
-    print(f"Generated {VLW_PATH.relative_to(ROOT)}")
+    write_header(resources)
+    write_source(resources)
+
+    for resource in resources:
+        print(f"Generated {resource.codepoints_path.relative_to(ROOT)}")
+        print(f"Generated {resource.vlw_path.relative_to(ROOT)}")
     print(f"Generated {HEADER_PATH.relative_to(ROOT)}")
     print(f"Generated {SOURCE_PATH.relative_to(ROOT)}")
-    print(f"Glyphs: {len(codepoints)}")
-    print(f"VLW bytes: {len(vlw_data)}")
+    for resource in resources:
+        print(
+            f"{resource.name}: {len(resource.codepoints)} glyphs, "
+            f"{len(resource.vlw_data)} VLW bytes"
+        )
 
 
 if __name__ == "__main__":

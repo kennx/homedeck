@@ -58,10 +58,6 @@ int rightEdgeOf(const FakePrintedText& entry) {
 }
 
 int realisticLineHeightFor(const FakePrintedText& entry) {
-  if (entry.fontKind == FakeFontKind::kDeviceDefault) {
-    return 20 * entry.size;
-  }
-
   return FakeDisplay::lineHeightFor(entry.fontKind) * entry.size;
 }
 
@@ -174,7 +170,7 @@ void test_render_truncates_holiday_text_using_device_font_metrics() {
   TEST_ASSERT_LESS_OR_EQUAL_INT(availableWidthFor(*holiday), renderedWidth(*holiday));
 }
 
-void test_render_uses_device_default_font_for_all_text_fields() {
+void test_render_uses_device_default_font_for_body_text_fields() {
   resetFakes();
 
   homedeck::HomeViewModel model;
@@ -195,11 +191,9 @@ void test_render_uses_device_default_font_for_all_text_fields() {
   HomeRenderer renderer;
   renderer.render(model);
 
-  assertPrintedFont("09:30", FakeFontKind::kDeviceDefault);
   assertPrintedFont("2026年5月21日 星期四", FakeFontKind::kDeviceDefault);
   assertPrintedFont("今日日程", FakeFontKind::kDeviceDefault);
   assertPrintedFont("09:00", FakeFontKind::kDeviceDefault);
-  assertPrintedFont("56%", FakeFontKind::kDeviceDefault);
   assertPrintedFont("开晨会", FakeFontKind::kDeviceDefault);
 }
 
@@ -271,7 +265,7 @@ void test_render_keeps_home_sections_separated_with_device_font_height() {
   }
 }
 
-void test_render_draws_temperature_value_with_device_default_font() {
+void test_render_keeps_wide_temperature_value_inside_metric_box() {
   resetFakes();
 
   homedeck::HomeViewModel model;
@@ -294,10 +288,48 @@ void test_render_draws_temperature_value_with_device_default_font() {
 
   const FakePrintedText* temperature = findPrintedText("130.0°C");
   TEST_ASSERT_NOT_NULL(temperature);
-  TEST_ASSERT_EQUAL_INT(
-      static_cast<int>(FakeFontKind::kDeviceDefault),
-      static_cast<int>(temperature->fontKind));
   TEST_ASSERT_LESS_OR_EQUAL_INT(20 + 170, rightEdgeOf(*temperature));
+}
+
+void test_render_draws_large_values_with_native_size_fonts() {
+  resetFakes();
+
+  homedeck::HomeViewModel model;
+  model.timeText = "09:30";
+  model.dateText = "2026年5月21日 星期四";
+  model.lunarText = "农历 四月初五";
+  model.solarTermText = "节气 小满";
+  model.holidayText = "节假日 无";
+  model.temperatureText = "23.7°C";
+  model.humidityText = "56%";
+  model.wifiConnected = true;
+  model.timeSynced = true;
+  model.calendarFresh = true;
+  model.sensorAvailable = true;
+  model.eventRows[0] = {"09:00", "开晨会"};
+  model.eventCount = 1;
+
+  HomeRenderer renderer;
+  renderer.render(model);
+
+  const FakePrintedText* time = findPrintedText("09:30");
+  const FakePrintedText* temperature = findPrintedText("23.7°C");
+  const FakePrintedText* humidity = findPrintedText("56%");
+  TEST_ASSERT_NOT_NULL(time);
+  TEST_ASSERT_NOT_NULL(temperature);
+  TEST_ASSERT_NOT_NULL(humidity);
+  TEST_ASSERT_EQUAL_INT(1, time->size);
+  TEST_ASSERT_EQUAL_INT(1, temperature->size);
+  TEST_ASSERT_EQUAL_INT(1, humidity->size);
+  TEST_ASSERT_EQUAL_INT(
+      static_cast<int>(FakeFontKind::kDeviceTime),
+      static_cast<int>(time->fontKind));
+  TEST_ASSERT_EQUAL_INT(
+      static_cast<int>(FakeFontKind::kDeviceMetric),
+      static_cast<int>(temperature->fontKind));
+  TEST_ASSERT_EQUAL_INT(
+      static_cast<int>(FakeFontKind::kDeviceMetric),
+      static_cast<int>(humidity->fontKind));
 }
 
 int main() {
@@ -305,8 +337,9 @@ int main() {
   RUN_TEST(test_render_shows_empty_event_message_when_event_count_is_zero);
   RUN_TEST(test_render_fits_long_holiday_and_event_text_within_screen);
   RUN_TEST(test_render_truncates_holiday_text_using_device_font_metrics);
-  RUN_TEST(test_render_uses_device_default_font_for_all_text_fields);
+  RUN_TEST(test_render_uses_device_default_font_for_body_text_fields);
   RUN_TEST(test_render_keeps_home_sections_separated_with_device_font_height);
-  RUN_TEST(test_render_draws_temperature_value_with_device_default_font);
+  RUN_TEST(test_render_keeps_wide_temperature_value_inside_metric_box);
+  RUN_TEST(test_render_draws_large_values_with_native_size_fonts);
   return UNITY_END();
 }

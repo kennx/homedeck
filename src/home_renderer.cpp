@@ -27,8 +27,10 @@ constexpr int kEventTimeWidth = 92;
 constexpr int kEventFooterY = 528;
 constexpr int kStatusY = 566;
 constexpr int kBodyTextSize = 1;
-constexpr int kMetricValueTextSize = 2;
-constexpr int kTimeTextSize = 3;
+constexpr int kMetricValueTextSize = 1;
+constexpr int kMetricValueFallbackTextSize = 2;
+constexpr int kTimeTextSize = 1;
+constexpr int kTimeFallbackTextSize = 3;
 
 void trimLastUtf8CodePoint(std::string* text) {
   if (text == nullptr || text->empty()) {
@@ -78,32 +80,76 @@ void drawText(
     M5Canvas& canvas,
     int x,
     int y,
+    homedeck::device_font::Role fontRole,
     int size,
+    int fallbackSize,
     const std::string& text,
     int maxWidth) {
-  canvas.setTextSize(size);
+  bool loaded = homedeck::device_font::apply(canvas, fontRole);
+  const int resolvedSize = loaded ? size : fallbackSize;
+  if (!loaded && fontRole != homedeck::device_font::Role::kBody) {
+    loaded = homedeck::device_font::applyDefault(canvas);
+  }
+  if (!loaded) {
+    canvas.setFont(nullptr);
+  }
+  canvas.setTextSize(resolvedSize);
   canvas.setCursor(x, y);
-  canvas.print(fitText(canvas, size, maxWidth, text).c_str());
+  canvas.print(fitText(canvas, resolvedSize, maxWidth, text).c_str());
 }
 
 void drawMetricBox(M5Canvas& canvas, int x, int y, const char* label, const std::string& value) {
   canvas.drawRect(x, y, kMetricBoxWidth, kMetricBoxHeight, TFT_BLACK);
 
-  drawText(canvas, x + 12, y + 12, kBodyTextSize, label, kMetricBoxWidth - 24);
-  drawText(canvas, x + 12, y + 44, kMetricValueTextSize, value, kMetricBoxWidth - 24);
+  drawText(
+      canvas,
+      x + 12,
+      y + 12,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      label,
+      kMetricBoxWidth - 24);
+  drawText(
+      canvas,
+      x + 12,
+      y + 44,
+      homedeck::device_font::Role::kMetricValue,
+      kMetricValueTextSize,
+      kMetricValueFallbackTextSize,
+      value,
+      kMetricBoxWidth - 24);
 }
 
 void drawEventRow(M5Canvas& canvas, int x, int y, const homedeck::EventRow& row) {
   if (row.timeText.empty()) {
-    drawText(canvas, x, y, kBodyTextSize, row.titleText, canvas.width() - x - kMarginX);
+    drawText(
+        canvas,
+        x,
+        y,
+        homedeck::device_font::Role::kBody,
+        kBodyTextSize,
+        kBodyTextSize,
+        row.titleText,
+        canvas.width() - x - kMarginX);
     return;
   }
 
-  drawText(canvas, x, y, kBodyTextSize, row.timeText, kEventTimeWidth - 8);
+  drawText(
+      canvas,
+      x,
+      y,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      row.timeText,
+      kEventTimeWidth - 8);
   drawText(
       canvas,
       x + kEventTimeWidth,
       y,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
       kBodyTextSize,
       row.titleText,
       canvas.width() - (x + kEventTimeWidth) - kMarginX);
@@ -128,18 +174,60 @@ void HomeRenderer::render(const homedeck::HomeViewModel& model) {
       canvas,
       kMarginX,
       kTimeY,
+      homedeck::device_font::Role::kTime,
       kTimeTextSize,
+      kTimeFallbackTextSize,
       model.timeText.empty() ? "--:--" : model.timeText,
       contentWidth);
-  drawText(canvas, kMarginX, kDateY, kBodyTextSize, model.dateText, contentWidth);
-  drawText(canvas, kMarginX, kLunarY, kBodyTextSize, model.lunarText, contentWidth);
-  drawText(canvas, kMarginX, kSolarTermY, kBodyTextSize, model.solarTermText, contentWidth);
-  drawText(canvas, kMarginX, kHolidayY, kBodyTextSize, model.holidayText, contentWidth);
+  drawText(
+      canvas,
+      kMarginX,
+      kDateY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      model.dateText,
+      contentWidth);
+  drawText(
+      canvas,
+      kMarginX,
+      kLunarY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      model.lunarText,
+      contentWidth);
+  drawText(
+      canvas,
+      kMarginX,
+      kSolarTermY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      model.solarTermText,
+      contentWidth);
+  drawText(
+      canvas,
+      kMarginX,
+      kHolidayY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      model.holidayText,
+      contentWidth);
 
   drawMetricBox(canvas, kMarginX, kMetricBoxY, "温度", model.temperatureText);
   drawMetricBox(canvas, kHumidityBoxX, kMetricBoxY, "湿度", model.humidityText);
 
-  drawText(canvas, kMarginX, kEventsTitleY, kBodyTextSize, "今日日程", contentWidth);
+  drawText(
+      canvas,
+      kMarginX,
+      kEventsTitleY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
+      kBodyTextSize,
+      "今日日程",
+      contentWidth);
 
   const std::uint32_t visibleCount = std::min<std::uint32_t>(
       model.eventCount,
@@ -163,6 +251,8 @@ void HomeRenderer::render(const homedeck::HomeViewModel& model) {
         canvas,
         kMarginX,
         kEventFooterY,
+        homedeck::device_font::Role::kBody,
+        kBodyTextSize,
         kBodyTextSize,
         "还有 " + std::to_string(model.eventCount - visibleCount) + " 项",
         contentWidth);
@@ -172,6 +262,8 @@ void HomeRenderer::render(const homedeck::HomeViewModel& model) {
       canvas,
       kMarginX,
       kStatusY,
+      homedeck::device_font::Role::kBody,
+      kBodyTextSize,
       kBodyTextSize,
       homedeck::buildStatusText(model),
       contentWidth);

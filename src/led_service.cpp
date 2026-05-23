@@ -15,12 +15,14 @@ bool LedService::begin() {
 
   // 1. Force enable M5PM1 LDO3V3 (RGB LED power)
   if (M5.In_I2C.isEnabled()) {
-    M5.In_I2C.bitOn(0x6E, 0x06, 1 << 2, 100000);
+    bool ok1 = M5.In_I2C.bitOn(0x6E, 0x06, 1 << 2, 100000);
     // Force enable GPIO3 output high (TF Card power)
-    M5.In_I2C.bitOff(0x6E, 0x16, 1 << 3, 100000);
-    M5.In_I2C.bitOn(0x6E, 0x10, 1 << 3, 100000);
-    M5.In_I2C.bitOff(0x6E, 0x13, 1 << 3, 100000);
-    M5.In_I2C.bitOn(0x6E, 0x11, 1 << 3, 100000);
+    bool ok2 = M5.In_I2C.bitOff(0x6E, 0x16, 1 << 3, 100000);
+    bool ok3 = M5.In_I2C.bitOn(0x6E, 0x10, 1 << 3, 100000);
+    bool ok4 = M5.In_I2C.bitOff(0x6E, 0x13, 1 << 3, 100000);
+    bool ok5 = M5.In_I2C.bitOn(0x6E, 0x11, 1 << 3, 100000);
+    Serial.printf("[LedService] PMU write: LDO3V3_ok=%d, GPIO3_ok=%d/%d/%d/%d\n",
+                  ok1, ok2, ok3, ok4, ok5);
   } else {
     Serial.println("[LedService] Warning: M5.In_I2C is not enabled!");
   }

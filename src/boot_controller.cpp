@@ -104,6 +104,9 @@ BootControllerDeps makeDefaultBootControllerDeps() {
   deps.m5Begin = []() {
     auto cfg = M5.config();
     cfg.serial_baudrate = 115200;
+    cfg.internal_imu = false;
+    cfg.internal_spk = false;
+    cfg.internal_mic = false;
     M5.begin(cfg);
   };
   deps.m5Update = []() { M5.update(); };

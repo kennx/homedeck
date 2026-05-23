@@ -87,6 +87,7 @@ struct FakeI2C {
   bool enabled = false;
   bool scanFound = false;
   bool failNextRead = false;
+  std::array<std::uint8_t, 256> registers{};
   std::array<std::uint8_t, 6> nextReadBuffer{};
 
   bool isEnabled() const {
@@ -119,6 +120,38 @@ struct FakeI2C {
     for (std::size_t i = 0; i < copyLength; ++i) {
       buffer[i] = nextReadBuffer[i];
     }
+    return true;
+  }
+
+  std::uint8_t readRegister8(std::uint8_t, std::uint8_t reg, std::uint32_t) {
+    if (!enabled || failNextRead) {
+      failNextRead = false;
+      return 0xFF;
+    }
+    return registers[reg];
+  }
+
+  bool writeRegister8(std::uint8_t, std::uint8_t reg, std::uint8_t value, std::uint32_t) {
+    if (!enabled) {
+      return false;
+    }
+    registers[reg] = value;
+    return true;
+  }
+
+  bool bitOn(std::uint8_t, std::uint8_t reg, std::uint8_t mask, std::uint32_t) {
+    if (!enabled) {
+      return false;
+    }
+    registers[reg] |= mask;
+    return true;
+  }
+
+  bool bitOff(std::uint8_t, std::uint8_t reg, std::uint8_t mask, std::uint32_t) {
+    if (!enabled) {
+      return false;
+    }
+    registers[reg] &= static_cast<std::uint8_t>(~mask);
     return true;
   }
 };

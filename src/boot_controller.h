@@ -75,6 +75,7 @@ struct BootControllerDeps {
 
   std::function<LunarDayInfo(int year, int month, int day)> describeLunarDate;
   std::function<void(const homedeck::HomeViewModel& model)> renderHomeScreen;
+  std::function<void()> displaySleep;
 };
 
 class BootController {

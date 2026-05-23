@@ -45,6 +45,8 @@ struct FakeRuntime {
   int sensorBeginCalls = 0;
   int sensorSampleCalls = 0;
   int syncCalls = 0;
+  int displaySleepCalls = 0;
+  bool displaySleepRanBeforeDeepSleep = false;
   int savePersonalCacheCalls = 0;
   int saveHolidayCacheCalls = 0;
   std::string lastApSsid;
@@ -147,6 +149,10 @@ BootControllerDeps makeDeps(FakeRuntime& runtime) {
   deps.syncTimeFromNtp = [&runtime]() {
     ++runtime.syncCalls;
     return runtime.syncTimeResult;
+  };
+  deps.displaySleep = [&runtime]() {
+    ++runtime.displaySleepCalls;
+    runtime.displaySleepRanBeforeDeepSleep = !gDeepSleepCalled;
   };
   deps.sensorBegin = [&runtime]() {
     ++runtime.sensorBeginCalls;
@@ -679,6 +685,24 @@ void test_enter_deep_sleep_sets_timer_and_calls_esp_deep_sleep() {
   TEST_ASSERT_EQUAL_UINT64(10ULL * 60ULL * 1000000ULL, gFakeSleepDurationUs);
 }
 
+void test_enter_deep_sleep_sleeps_display_before_esp_deep_sleep() {
+  resetNativeFakes();
+  FakeRuntime runtime;
+  runtime.config = {
+      "HomeWiFi", "secret", "Asia/Shanghai", "pool.ntp.org", "", "",
+  };
+
+  BootController controller(makeDeps(runtime));
+  controller.begin();
+
+  gDeepSleepCalled = false;
+  controller.enterDeepSleep();
+
+  TEST_ASSERT_EQUAL(1, runtime.displaySleepCalls);
+  TEST_ASSERT_TRUE(runtime.displaySleepRanBeforeDeepSleep);
+  TEST_ASSERT_TRUE(gDeepSleepCalled);
+}
+
 void test_deep_sleep_not_entered_in_ap_mode() {
   resetNativeFakes();
   FakeRuntime runtime;
@@ -944,6 +968,52 @@ void test_wifi_success_does_not_clear_failure_count_when_network_cycle_still_fai
   TEST_ASSERT_EQUAL_UINT8(3, persisted.consecutiveNetworkFailures);
 }
 
+void test_ntp_throttled_sync_does_not_count_as_network_failure_when_calendar_succeeds() {
+  resetNativeFakes();
+
+  RtcMemoryState rtcState{};
+  rtcState.magic = kRtcMemoryMagic;
+  rtcState.consecutiveNetworkFailures = 2;
+  setFakeRtcState(rtcState);
+
+  FakeRuntime runtime;
+  runtime.config = {
+      "HomeWiFi",
+      "secret",
+      "Asia/Shanghai",
+      "pool.ntp.org",
+      "https://calendar.example.com/home.ics",
+      "https://calendar.example.com/holiday.ics",
+  };
+  runtime.wifiConnectResult = true;
+  runtime.syncTimeResult = false;
+  runtime.fetchSucceeds = true;
+  runtime.snapshots.push_back({0, TimeSnapshot{"09:30", "2026年5月21日", true, true}});
+  runtime.snapshots.push_back({1, TimeSnapshot{"09:30", "2026年5月21日", true, true}});
+
+  BootControllerDeps deps = makeDeps(runtime);
+  deps.parsePersonalCalendar = [](const char*, int, int, int) {
+    ParsedPersonalCalendar result;
+    result.events[0] = {"09:00", "已同步会议"};
+    result.eventCount = 1;
+    return result;
+  };
+  deps.parseHolidayCalendar = [](const char*, int, int, int) {
+    return ParsedHolidayCalendar{"节假日 已同步节日"};
+  };
+
+  fakeArduinoSetMillis(0);
+  BootController controller(std::move(deps));
+  controller.begin();
+  fakeArduinoSetMillis(1);
+  controller.update();
+
+  const RtcMemoryState persisted = fakeRtcState();
+  TEST_ASSERT_EQUAL(1, runtime.connectWifiCalls);
+  TEST_ASSERT_EQUAL(1, runtime.syncCalls);
+  TEST_ASSERT_EQUAL_UINT8(0, persisted.consecutiveNetworkFailures);
+}
+
 void test_ap_mode_timeout_restarts_after_ten_minutes() {
   resetNativeFakes();
   FakeRuntime runtime;
@@ -1145,6 +1215,7 @@ int main() {
   RUN_TEST(test_update_refreshes_home_screen_after_one_hour);
   RUN_TEST(test_timer_wakeup_uses_fast_path);
   RUN_TEST(test_enter_deep_sleep_sets_timer_and_calls_esp_deep_sleep);
+  RUN_TEST(test_enter_deep_sleep_sleeps_display_before_esp_deep_sleep);
   RUN_TEST(test_deep_sleep_not_entered_in_ap_mode);
   RUN_TEST(test_hash_skips_refresh_when_model_unchanged);
   RUN_TEST(test_timer_wakeup_network_backoff_uses_sleep_slots_for_thirty_minutes);
@@ -1154,6 +1225,7 @@ int main() {
   RUN_TEST(test_enter_deep_sleep_persists_last_successful_ntp_sync_for_next_timer_wakeup);
   RUN_TEST(test_timer_wakeup_restores_sync_state_after_time_begin);
   RUN_TEST(test_wifi_success_does_not_clear_failure_count_when_network_cycle_still_fails);
+  RUN_TEST(test_ntp_throttled_sync_does_not_count_as_network_failure_when_calendar_succeeds);
   RUN_TEST(test_ap_mode_timeout_restarts_after_ten_minutes);
   RUN_TEST(test_fake_arduino_millis_is_controllable);
   RUN_TEST(test_make_deps_does_not_inject_timer_wakeup_from_runtime_flag);

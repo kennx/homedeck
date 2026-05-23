@@ -80,11 +80,33 @@ void test_led_service_blinking_red_when_low_battery() {
   TEST_ASSERT_EQUAL_UINT8(0, pixels.b[1]);
 }
 
+void test_led_service_treats_pm1_5vin_power_source_as_usb_when_vbus_voltage_unavailable() {
+  M5.Power.vbus_voltage = -1;
+  M5.In_I2C.enabled = true;
+  M5.In_I2C.registers[0x04] = 0;
+
+  LedService service;
+
+  TEST_ASSERT_TRUE(service.isUsbConnected());
+}
+
+void test_led_service_does_not_treat_pm1_5vinout_power_source_as_usb() {
+  M5.Power.vbus_voltage = -1;
+  M5.In_I2C.enabled = true;
+  M5.In_I2C.registers[0x04] = 1;
+
+  LedService service;
+
+  TEST_ASSERT_FALSE(service.isUsbConnected());
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_led_service_init);
   RUN_TEST(test_led_service_orange_when_charging_less_than_100);
   RUN_TEST(test_led_service_green_when_charging_at_100);
   RUN_TEST(test_led_service_blinking_red_when_low_battery);
+  RUN_TEST(test_led_service_treats_pm1_5vin_power_source_as_usb_when_vbus_voltage_unavailable);
+  RUN_TEST(test_led_service_does_not_treat_pm1_5vinout_power_source_as_usb);
   return UNITY_END();
 }

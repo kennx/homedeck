@@ -231,6 +231,10 @@ BootControllerDeps makeDefaultBootControllerDeps() {
   deps.renderHomeScreen = [](const homedeck::HomeViewModel& model) {
     homeRenderer.render(model);
   };
+  deps.displaySleep = []() {
+    M5.Display.sleep();
+    M5.Display.waitDisplay();
+  };
   return deps;
 }
 
@@ -531,7 +535,9 @@ bool BootController::runBackgroundTasks(unsigned long nowMs, TimeSnapshot* snaps
   const bool personalWasFresh = personalCalendarFresh_;
   const bool holidayWasFresh = holidayCalendarFresh_;
   syncCalendarStateForSnapshot(*snapshot);
-  const bool networkCycleSucceeded = wifiConnected_ && timeSyncedNow &&
+  const bool timeSyncedOrStillCurrent = timeSyncedNow ||
+      (snapshot != nullptr && snapshot->timeSynced);
+  const bool networkCycleSucceeded = wifiConnected_ && timeSyncedOrStillCurrent &&
       personalCalendarFresh_ && holidayCalendarFresh_;
   if (networkCycleSucceeded) {
     resetNetworkFailureCount();
@@ -930,6 +936,9 @@ void BootController::enterDeepSleep() {
 
   // 3. 只有在进入 Deep Sleep 前才熄灭指示灯，降功耗
   ledService_.turnOff();
+  if (deps_.displaySleep) {
+    deps_.displaySleep();
+  }
 
   saveStateToRtcMemory();
 

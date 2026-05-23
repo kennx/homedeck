@@ -4,6 +4,12 @@
 #include <cmath>
 
 static constexpr uint8_t LED_COUNT = 2;
+static constexpr std::uint8_t kM5Pm1I2cAddress = 0x6E;
+static constexpr std::uint8_t kM5Pm1PowerSourceRegister = 0x04;
+static constexpr std::uint8_t kM5Pm1PowerConfigRegister = 0x06;
+static constexpr std::uint8_t kM5Pm1PowerSourceMask = 0x07;
+static constexpr std::uint8_t kM5Pm1PowerSource5Vin = 0;
+static constexpr std::uint8_t kM5Pm1LdoEnableMask = 1 << 2;
 
 #if !defined(UNIT_TEST)
 #include <Adafruit_NeoPixel.h>
@@ -70,10 +76,10 @@ bool LedService::begin() {
 
   // Ensure LDO3V3 (RGB power) is enabled via M5PM1
   if (M5.In_I2C.isEnabled()) {
-    uint8_t reg06 = M5.In_I2C.readRegister8(0x6E, 0x06, 100000);
+    uint8_t reg06 = M5.In_I2C.readRegister8(kM5Pm1I2cAddress, kM5Pm1PowerConfigRegister, 100000);
     Serial.printf("[LedService] PMU 0x06 = 0x%02X (LDO=%d)\n", reg06, (reg06 >> 2) & 1);
-    if (!(reg06 & (1 << 2))) {
-      M5.In_I2C.bitOn(0x6E, 0x06, 1 << 2, 100000);
+    if (!(reg06 & kM5Pm1LdoEnableMask)) {
+      M5.In_I2C.bitOn(kM5Pm1I2cAddress, kM5Pm1PowerConfigRegister, kM5Pm1LdoEnableMask, 100000);
       Serial.println("[LedService] LDO3V3 was off, enabled it.");
     }
   }
@@ -97,12 +103,11 @@ bool LedService::isUsbConnected() const {
   if (M5.Power.getVBUSVoltage() > 4000) {
     return true;
   }
-#if !defined(UNIT_TEST)
   if (M5.In_I2C.isEnabled()) {
-    std::uint8_t val = M5.In_I2C.readRegister8(0x6E, 0x04, 100000);
-    return (val & 0x07) == 1;
+    const std::uint8_t val =
+        M5.In_I2C.readRegister8(kM5Pm1I2cAddress, kM5Pm1PowerSourceRegister, 100000);
+    return (val & kM5Pm1PowerSourceMask) == kM5Pm1PowerSource5Vin;
   }
-#endif
   return false;
 }
 

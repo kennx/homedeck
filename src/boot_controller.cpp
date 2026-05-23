@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <cstdio>
+#include <ctime>
 #include <utility>
 
 #include "homedeck/home_screen.h"
@@ -29,7 +31,7 @@ constexpr unsigned long kSensorSampleIntervalMs = 10UL * 60UL * 1000UL;
 constexpr unsigned long kNetworkRetryIntervalMs = 60UL * 1000UL;
 constexpr unsigned long kApModeTimeoutMs = 10UL * 60UL * 1000UL;
 constexpr uint64_t kDeepSleepIntervalUs = 10ULL * 60ULL * 1000000ULL;
-constexpr uint32_t kRtcMemoryMagic = 0x48444543;  // "HDEC"
+constexpr uint32_t kRtcMemoryMagic = 0x48444544;  // "HDED"，Task 4 升级 RTC schema
 
 std::string makeIsoTimestamp(const TimeSnapshot& snapshot) {
   return snapshot.dateText + " " + snapshot.timeText;
@@ -53,16 +55,26 @@ bool isSameDatePrefix(const std::string& cacheUpdatedAt, const std::string& date
   return !dateText.empty() && cacheUpdatedAt.rfind(dateText, 0) == 0;
 }
 
-RtcMemoryState gRtcState;
+#if !defined(UNIT_TEST)
+RTC_DATA_ATTR RtcMemoryState gRtcState;
+#endif
+
+RtcMemoryState* rtcMemoryStatePtr() {
+#if defined(UNIT_TEST)
+  return reinterpret_cast<RtcMemoryState*>(fakeEspSleepRtcMemory());
+#else
+  return &gRtcState;
+#endif
+}
 
 void rtcMemoryWrite(const RtcMemoryState& state) {
-  gRtcState = state;
+  std::memcpy(rtcMemoryStatePtr(), &state, sizeof(state));
 }
 
 bool rtcMemoryRead(RtcMemoryState* state) {
   if (state == nullptr) return false;
-  *state = gRtcState;
-  return gRtcState.magic == kRtcMemoryMagic;
+  std::memcpy(state, rtcMemoryStatePtr(), sizeof(*state));
+  return state->magic == kRtcMemoryMagic;
 }
 
 uint32_t hashString(const std::string& s) {
@@ -171,6 +183,12 @@ BootControllerDeps makeDefaultBootControllerDeps() {
     return timeService.begin(timezonePosix, ntpServer);
   };
   deps.timeSnapshot = []() { return timeService.snapshot(); };
+  deps.timeRestoreSyncState = [](time_t value) {
+    timeService.restoreSyncState(value);
+  };
+  deps.timeLastSuccessfulSyncUnix = []() {
+    return timeService.lastSuccessfulSyncUnix();
+  };
   deps.syncTimeFromNtp = []() { return timeService.syncFromNtp(); };
   deps.sensorBegin = []() { return sensorService.begin(); };
   deps.sensorSample = []() { return sensorService.sample(); };
@@ -239,6 +257,11 @@ void BootController::begin() {
 
   if (deps_.loadSetupConfig) {
     config_ = deps_.loadSetupConfig();
+  }
+
+  RtcMemoryState rtcState{};
+  if (rtcMemoryRead(&rtcState)) {
+    currentWakeupCount_ = rtcState.wakeupCount;
   }
 
   const esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
@@ -337,7 +360,9 @@ void BootController::enterHomeMode(const homedeck::SetupConfig& config) {
   sensorSnapshot_ = SensorSnapshot{};
   sensorSampled_ = false;
   lastSensorSampleAtMs_ = 0;
+  lastSensorSampleWakeupCount_ = 0;
   lastNetworkAttemptAtMs_ = 0;
+  lastNetworkAttemptWakeupCount_ = 0;
 
   if (deps_.timeBegin) {
     const std::string timezonePosix = resolveTimezonePosix(config.timezoneIana);
@@ -350,6 +375,7 @@ void BootController::enterHomeMode(const homedeck::SetupConfig& config) {
     sensorSnapshot_ = deps_.sensorSample();
     sensorSampled_ = true;
     lastSensorSampleAtMs_ = deps_.millis ? deps_.millis() : 0;
+    lastSensorSampleWakeupCount_ = currentWakeupCount_;
   }
 
   const TimeSnapshot snapshot = deps_.timeSnapshot ? deps_.timeSnapshot() : TimeSnapshot{};
@@ -375,12 +401,15 @@ void BootController::enterHomeModeFast(const homedeck::SetupConfig& config) {
   sensorSnapshot_ = SensorSnapshot{};
   sensorSampled_ = false;
   lastSensorSampleAtMs_ = 0;
+  lastSensorSampleWakeupCount_ = 0;
   lastNetworkAttemptAtMs_ = 0;
+  lastNetworkAttemptWakeupCount_ = 0;
   lastModelHash_ = 0;
 
-  // 从 RTC 内存恢复传感器状态
+  // 从 RTC 内存恢复 Task 3 的传感器/slot 状态。
   restoreStateFromRtcMemory();
-  if (sensorSnapshot_.available) {
+  if (sensorSnapshot_.available || !sensorSnapshot_.temperatureText.empty() ||
+      !sensorSnapshot_.humidityText.empty()) {
     sensorSampled_ = true;
   }
 
@@ -388,6 +417,11 @@ void BootController::enterHomeModeFast(const homedeck::SetupConfig& config) {
   if (deps_.timeBegin) {
     const std::string timezonePosix = resolveTimezonePosix(config.timezoneIana);
     deps_.timeBegin(timezonePosix.c_str(), config.ntpServer.c_str());
+  }
+
+  RtcMemoryState rtcState{};
+  if (rtcMemoryRead(&rtcState) && deps_.timeRestoreSyncState) {
+    deps_.timeRestoreSyncState(rtcState.lastNtpSyncAt);
   }
 
   // 传感器初始化仍然需要（I2C 状态在 deep sleep 后丢失）
@@ -415,6 +449,7 @@ uint32_t BootController::hashHomeViewModel(const homedeck::HomeViewModel& model)
   mix(model.holidayText);
   mix(model.temperatureText);
   mix(model.humidityText);
+  hash = ((hash << 5) + hash) + model.eventCount;
   for (const auto& row : model.eventRows) {
     mix(row.timeText);
     mix(row.titleText);
@@ -461,13 +496,12 @@ bool BootController::runBackgroundTasks(unsigned long nowMs, TimeSnapshot* snaps
 
   networkCycleStarted_ = true;
   lastNetworkAttemptAtMs_ = nowMs;
+  lastNetworkAttemptWakeupCount_ = currentWakeupCount_;
   wifiConnected_ = deps_.connectWifi
       ? deps_.connectWifi(config_.wifiSsid, config_.wifiPassword)
       : false;
 
-  if (wifiConnected_) {
-    resetNetworkFailureCount();
-  } else {
+  if (!wifiConnected_) {
     recordNetworkFailure();
   }
 
@@ -487,6 +521,13 @@ bool BootController::runBackgroundTasks(unsigned long nowMs, TimeSnapshot* snaps
   const bool personalWasFresh = personalCalendarFresh_;
   const bool holidayWasFresh = holidayCalendarFresh_;
   syncCalendarStateForSnapshot(*snapshot);
+  const bool networkCycleSucceeded = wifiConnected_ && timeSyncedNow &&
+      personalCalendarFresh_ && holidayCalendarFresh_;
+  if (networkCycleSucceeded) {
+    resetNetworkFailureCount();
+  } else if (wifiConnected_) {
+    recordNetworkFailure();
+  }
   if (personalCalendarFresh_ && holidayCalendarFresh_) {
     lastNetworkCycleAtMs_ = nowMs;
   }
@@ -509,16 +550,21 @@ bool BootController::updateSensorState(unsigned long nowMs) {
     sensorSnapshot_ = deps_.sensorSample();
     sensorSampled_ = true;
     lastSensorSampleAtMs_ = nowMs;
+    lastSensorSampleWakeupCount_ = currentWakeupCount_;
     return false;
   }
 
-  if (nowMs - lastSensorSampleAtMs_ < kSensorSampleIntervalMs) {
+  const bool millisElapsed = nowMs - lastSensorSampleAtMs_ >= kSensorSampleIntervalMs;
+  const bool slotElapsed = hasElapsedSleepSlots(
+      currentWakeupCount_, lastSensorSampleWakeupCount_, kSensorSampleIntervalMs);
+  if (!millisElapsed && !slotElapsed) {
     return false;
   }
 
   const bool wasAvailable = sensorSnapshot_.available;
   sensorSnapshot_ = deps_.sensorSample();
   lastSensorSampleAtMs_ = nowMs;
+  lastSensorSampleWakeupCount_ = currentWakeupCount_;
   return !wasAvailable && sensorSnapshot_.available;
 }
 
@@ -752,7 +798,8 @@ bool BootController::shouldRunNetworkCycle(unsigned long nowMs) const {
   // 指数退避：根据连续失败次数决定间隔
   unsigned long interval = kRefreshIntervalMs;
   if (!personalCalendarFresh_ || !holidayCalendarFresh_) {
-    const uint8_t failures = gRtcState.consecutiveNetworkFailures;
+    RtcMemoryState rtcState{};
+    const uint8_t failures = rtcMemoryRead(&rtcState) ? rtcState.consecutiveNetworkFailures : 0;
     if (failures >= 5) {
       interval = 60UL * 60UL * 1000UL;  // 60 分钟
     } else if (failures >= 3) {
@@ -762,30 +809,70 @@ bool BootController::shouldRunNetworkCycle(unsigned long nowMs) const {
     }
   }
 
-  return !networkCycleStarted_ || (nowMs - lastNetworkAttemptAtMs_ >= interval);
+  if (!networkCycleStarted_) {
+    return true;
+  }
+
+  const bool millisElapsed = nowMs - lastNetworkAttemptAtMs_ >= interval;
+  const bool slotElapsed = hasElapsedSleepSlots(
+      currentWakeupCount_, lastNetworkAttemptWakeupCount_, interval);
+  return millisElapsed || slotElapsed;
+}
+
+bool BootController::hasElapsedSleepSlots(
+    uint32_t currentWakeupCount,
+    uint32_t lastWakeupCount,
+    unsigned long intervalMs) const {
+  if (currentWakeupCount <= lastWakeupCount) {
+    return false;
+  }
+
+  const uint64_t elapsedSleepMs =
+      static_cast<uint64_t>(currentWakeupCount - lastWakeupCount) *
+      (kDeepSleepIntervalUs / 1000ULL);
+  return elapsedSleepMs >= intervalMs;
 }
 
 void BootController::recordNetworkFailure() {
-  if (gRtcState.consecutiveNetworkFailures < 255) {
-    gRtcState.consecutiveNetworkFailures++;
+  RtcMemoryState state{};
+  if (!rtcMemoryRead(&state)) {
+    state = RtcMemoryState{};
+    state.magic = kRtcMemoryMagic;
   }
+  if (state.consecutiveNetworkFailures < 255) {
+    state.consecutiveNetworkFailures++;
+  }
+  rtcMemoryWrite(state);
 }
 
 void BootController::resetNetworkFailureCount() {
-  gRtcState.consecutiveNetworkFailures = 0;
+  RtcMemoryState state{};
+  if (!rtcMemoryRead(&state)) {
+    state = RtcMemoryState{};
+  }
+  state.magic = kRtcMemoryMagic;
+  state.consecutiveNetworkFailures = 0;
+  rtcMemoryWrite(state);
 }
 
 void BootController::saveStateToRtcMemory() {
+  RtcMemoryState previous{};
+  const bool hasPrevious = rtcMemoryRead(&previous);
+
   RtcMemoryState state{};
   state.magic = kRtcMemoryMagic;
-  state.wakeupCount = gRtcState.wakeupCount + 1;
-  state.lastNtpSyncAt = 0;  // 由 TimeService 内部维护，这里不需要重复保存
+  state.wakeupCount = currentWakeupCount_ + 1;
+  state.lastNtpSyncAt = deps_.timeLastSuccessfulSyncUnix
+      ? deps_.timeLastSuccessfulSyncUnix()
+      : (hasPrevious ? previous.lastNtpSyncAt : 0);
+  state.lastSensorSampleWakeupCount = lastSensorSampleWakeupCount_;
+  state.lastNetworkAttemptWakeupCount = lastNetworkAttemptWakeupCount_;
   state.lastSensorAvailable = sensorSnapshot_.available;
 
   std::snprintf(state.lastSensorTemp, sizeof(state.lastSensorTemp), "%s", sensorSnapshot_.temperatureText.c_str());
   std::snprintf(state.lastSensorHumidity, sizeof(state.lastSensorHumidity), "%s", sensorSnapshot_.humidityText.c_str());
 
-  state.consecutiveNetworkFailures = 0;  // 每次成功完成周期后重置
+  state.consecutiveNetworkFailures = hasPrevious ? previous.consecutiveNetworkFailures : 0;
   state.isConfigured = hasSavedConfig(config_);
 
   rtcMemoryWrite(state);
@@ -797,10 +884,12 @@ void BootController::restoreStateFromRtcMemory() {
     return;  // RTC 内存无效，使用默认值
   }
 
-  gRtcState = state;
   sensorSnapshot_.temperatureText = state.lastSensorTemp;
   sensorSnapshot_.humidityText = state.lastSensorHumidity;
   sensorSnapshot_.available = state.lastSensorAvailable;
+  currentWakeupCount_ = state.wakeupCount;
+  lastSensorSampleWakeupCount_ = state.lastSensorSampleWakeupCount;
+  lastNetworkAttemptWakeupCount_ = state.lastNetworkAttemptWakeupCount;
 }
 
 void BootController::enterDeepSleep() {

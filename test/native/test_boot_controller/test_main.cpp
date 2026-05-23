@@ -11,10 +11,16 @@
 #include "../support/fake_arduino/Arduino.h"
 #include "../support/fake_arduino/esp_sleep.h"
 
+#include "../../../src/led_service.h"
+#include "../../../src/led_service.cpp"
+
 #define private public
 #include "../../../src/boot_controller.h"
 #include "../../../src/boot_controller.cpp"
 #undef private
+
+#include <M5Unified.h>
+FakeM5Global M5;
 
 namespace {
 
@@ -55,6 +61,7 @@ struct FakeRuntime {
 void resetNativeFakes() {
   fakeArduinoResetClock();
   fakeEspSleepReset();
+  M5 = FakeM5Global{};
 }
 
 RtcMemoryState fakeRtcState() {
@@ -1027,6 +1034,70 @@ void test_deep_sleep_reboot_resets_millis_and_preserves_rtc_state() {
   TEST_ASSERT_FALSE(runtime.lastModel.sensorAvailable);
 }
 
+void test_boot_controller_no_sleep_when_charging() {
+  resetNativeFakes();
+  M5.Power.vbus_voltage = 5000;
+  M5.Power.battery_level = 80;
+
+  FakeRuntime runtime;
+  runtime.config = {
+      "HomeWiFi", "secret", "Asia/Shanghai", "pool.ntp.org", "", "",
+  };
+
+  BootController controller(makeDeps(runtime));
+  controller.begin();
+
+  gDeepSleepCalled = false;
+  controller.enterDeepSleep();
+
+  TEST_ASSERT_FALSE(gDeepSleepCalled);
+}
+
+void test_boot_controller_sleep_immediately_when_battery_high() {
+  resetNativeFakes();
+  M5.Power.vbus_voltage = 0;
+  M5.Power.battery_level = 50;
+
+  FakeRuntime runtime;
+  runtime.config = {
+      "HomeWiFi", "secret", "Asia/Shanghai", "pool.ntp.org", "", "",
+  };
+
+  BootController controller(makeDeps(runtime));
+  controller.begin();
+
+  gDeepSleepCalled = false;
+  controller.enterDeepSleep();
+
+  TEST_ASSERT_TRUE(gDeepSleepCalled);
+}
+
+void test_boot_controller_defer_sleep_when_battery_low() {
+  resetNativeFakes();
+  M5.Power.vbus_voltage = 0;
+  M5.Power.battery_level = 3;
+
+  FakeRuntime runtime;
+  runtime.config = {
+      "HomeWiFi", "secret", "Asia/Shanghai", "pool.ntp.org", "", "",
+  };
+
+  BootController controller(makeDeps(runtime));
+  controller.begin();
+
+  gDeepSleepCalled = false;
+  fakeArduinoSetMillis(1000);
+  controller.enterDeepSleep();
+  // 第一次调用应当延迟，不休眠
+  TEST_ASSERT_FALSE(gDeepSleepCalled);
+
+  // 模拟 31 秒后再次调用
+  fakeArduinoSetMillis(32000);
+  controller.enterDeepSleep();
+  // 第二次调用应当休眠
+  TEST_ASSERT_TRUE(gDeepSleepCalled);
+}
+
 }  // namespace
 
 int main() {
@@ -1059,5 +1130,8 @@ int main() {
   RUN_TEST(test_make_deps_does_not_inject_timer_wakeup_from_runtime_flag);
   RUN_TEST(test_fake_reboot_without_timer_wakeup_does_not_report_timer_cause);
   RUN_TEST(test_deep_sleep_reboot_resets_millis_and_preserves_rtc_state);
+  RUN_TEST(test_boot_controller_no_sleep_when_charging);
+  RUN_TEST(test_boot_controller_sleep_immediately_when_battery_high);
+  RUN_TEST(test_boot_controller_defer_sleep_when_battery_low);
   return UNITY_END();
 }

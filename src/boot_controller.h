@@ -11,6 +11,7 @@
 #include "lunar_calendar_service.h"
 #include "sensor_service.h"
 #include "time_service.h"
+#include "led_service.h"
 
 struct BootCalendarCacheRecord {
   std::string payload;
@@ -141,4 +142,5 @@ class BootController {
   uint32_t lastNetworkAttemptWakeupCount_ = 0;
   uint32_t lastModelHash_ = 0;
   unsigned long apModeStartAtMs_ = 0;
+  LedService ledService_;
 };

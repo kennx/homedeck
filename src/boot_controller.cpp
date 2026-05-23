@@ -243,6 +243,7 @@ BootController::BootController(BootControllerDeps deps) : deps_(std::move(deps))
 }
 
 void BootController::begin() {
+  ledService_.begin();
   if (started_) {
     return;
   }
@@ -288,6 +289,7 @@ void BootController::begin() {
 }
 
 void BootController::update() {
+  ledService_.update();
   if (!started_) {
     return;
   }
@@ -896,6 +898,28 @@ void BootController::enterDeepSleep() {
   if (accessPointMode_) {
     return;
   }
+
+  // 1. 如果正在充电（USB 接入），阻止进入 Deep Sleep，保持 Active 状态
+  if (ledService_.isUsbConnected()) {
+    return;
+  }
+
+  // 2. 如果是电池供电且电量 < 5%，延迟 30 秒进入 Deep Sleep 并在闪烁警告后休眠
+  int batteryLevel = ledService_.getBatteryLevel();
+  if (batteryLevel >= 0 && batteryLevel < 5) {
+    static unsigned long warningStartMs = 0;
+    if (warningStartMs == 0) {
+      warningStartMs = deps_.millis ? deps_.millis() : 0;
+    }
+    unsigned long now = deps_.millis ? deps_.millis() : 0;
+    if (now - warningStartMs < 30000UL) {
+      return; // 暂不休眠，继续通过主 loop 更新闪烁
+    }
+    warningStartMs = 0; // 闪烁完毕，重置计数器
+  }
+
+  // 3. 只有在进入 Deep Sleep 前才熄灭指示灯，降功耗
+  ledService_.turnOff();
 
   saveStateToRtcMemory();
 

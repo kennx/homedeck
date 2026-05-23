@@ -30,6 +30,11 @@ bool isSystemTimeValid(time_t now) {
   return now >= kValidTimestampThreshold;
 }
 
+bool hasRestorableSyncState(time_t now, time_t lastSuccessfulSyncUnix) {
+  return isSystemTimeValid(now) && lastSuccessfulSyncUnix > 0 &&
+         lastSuccessfulSyncUnix <= now;
+}
+
 bool convertUtcRtcToLocalTm(const m5::rtc_datetime_t& rtcDateTime, tm* localTime) {
   if (localTime == nullptr) {
     return false;
@@ -106,6 +111,15 @@ bool TimeService::begin(const char* timezonePosix, const char* ntpServer) {
   return rtcAvailable_ || (!timezonePosix_.empty() && !ntpServer_.empty());
 }
 
+void TimeService::restoreSyncState(time_t lastSuccessfulSyncUnix) {
+  lastSyncedAt_ = lastSuccessfulSyncUnix;
+  timeSynced_ = hasRestorableSyncState(time(nullptr), lastSuccessfulSyncUnix);
+}
+
+time_t TimeService::lastSuccessfulSyncUnix() const {
+  return lastSyncedAt_;
+}
+
 TimeSnapshot TimeService::snapshot() const {
   const time_t now = time(nullptr);
   if (isSystemTimeValid(now)) {
@@ -148,7 +162,7 @@ bool TimeService::syncFromNtp() {
 
   const time_t now = time(nullptr);
   if (timeSynced_ && rtcAvailable_ && !M5.Rtc.getVoltLow() &&
-      isSystemTimeValid(now) && lastSyncedAt_ > 0 &&
+      hasRestorableSyncState(now, lastSyncedAt_) &&
       (now - lastSyncedAt_) < (24 * 3600)) {
     return false;
   }

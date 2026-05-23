@@ -71,9 +71,11 @@ std::array<std::uint8_t, 6> makeSht40BytesWithInvalidCrc(
 
 }  // namespace
 
+#define private public
 #define time(...) fakeTimeNow(__VA_ARGS__)
 #define configTzTime(...) fakeConfigTzTime(__VA_ARGS__)
 #include "../../../src/time_service.cpp"
+#undef private
 #include "../../../src/sensor_service.cpp"
 #undef configTzTime
 #undef time
@@ -180,6 +182,88 @@ void test_begin_does_not_restore_system_time_from_low_voltage_rtc() {
   TEST_ASSERT_FALSE(snapshot.timeValid);
 }
 
+void test_restore_sync_state_marks_snapshot_synced_when_system_time_is_valid() {
+  resetFakes();
+  setenv("TZ", "CST-8", 1);
+  tzset();
+
+  gFakeNow = 1779355800;
+
+  TimeService service;
+  TEST_ASSERT_TRUE(service.begin("CST-8", "pool.ntp.org"));
+
+  service.restoreSyncState(1779352200);
+
+  const TimeSnapshot snapshot = service.snapshot();
+  TEST_ASSERT_TRUE(snapshot.timeValid);
+  TEST_ASSERT_TRUE(snapshot.timeSynced);
+  TEST_ASSERT_EQUAL_INT64(1779352200, service.lastSuccessfulSyncUnix());
+}
+
+void test_restore_sync_state_throttles_ntp_within_24_hours() {
+  resetFakes();
+  setenv("TZ", "CST-8", 1);
+  tzset();
+
+  M5.Rtc.enabled = true;
+  M5.Rtc.getDateTimeOk = true;
+  gFakeNow = 1779355800;
+
+  TimeService service;
+  TEST_ASSERT_TRUE(service.begin("CST-8", "pool.ntp.org"));
+
+  service.restoreSyncState(gFakeNow - 600);
+
+  TEST_ASSERT_FALSE(service.syncFromNtp());
+  TEST_ASSERT_FALSE(gConfigTzTimeCalled);
+}
+
+void test_restore_sync_state_does_not_throttle_ntp_for_future_timestamp() {
+  resetFakes();
+  setenv("TZ", "CST-8", 1);
+  tzset();
+
+  M5.Rtc.enabled = true;
+  M5.Rtc.getDateTimeOk = true;
+  gFakeNow = 1779355800;
+  gFakeDelayCallback = [](unsigned long) {
+    gFakeNow = 1779359400;
+    fakeSntpNotifySync();
+  };
+
+  TimeService service;
+  TEST_ASSERT_TRUE(service.begin("CST-8", "pool.ntp.org"));
+
+  service.restoreSyncState(gFakeNow + 600);
+
+  TEST_ASSERT_TRUE(service.syncFromNtp());
+  TEST_ASSERT_TRUE(gConfigTzTimeCalled);
+}
+
+void test_restore_sync_state_does_not_mark_synced_when_system_time_is_invalid() {
+  resetFakes();
+  setenv("TZ", "CST-8", 1);
+  tzset();
+
+  M5.Rtc.enabled = true;
+  M5.Rtc.getDateTimeOk = true;
+  M5.Rtc.dateTime = {{2026, 5, 21, 4}, {1, 30, 0}};
+  gFakeNow = 0;
+
+  TimeService service;
+  TEST_ASSERT_TRUE(service.begin("CST-8", "pool.ntp.org"));
+
+  service.restoreSyncState(1779352200);
+
+  TEST_ASSERT_FALSE(service.timeSynced_);
+
+  const TimeSnapshot snapshot = service.snapshot();
+  TEST_ASSERT_TRUE(snapshot.timeValid);
+  TEST_ASSERT_EQUAL_STRING("09:30", snapshot.timeText.c_str());
+  TEST_ASSERT_FALSE(snapshot.timeSynced);
+  TEST_ASSERT_EQUAL_INT64(1779352200, service.lastSuccessfulSyncUnix());
+}
+
 void test_sensor_service_retries_after_transient_read_failure() {
   resetFakes();
   M5.In_I2C.enabled = true;
@@ -225,6 +309,10 @@ int main() {
   RUN_TEST(test_snapshot_converts_rtc_utc_time_into_local_timezone);
   RUN_TEST(test_snapshot_returns_invalid_when_rtc_voltage_is_low);
   RUN_TEST(test_begin_does_not_restore_system_time_from_low_voltage_rtc);
+  RUN_TEST(test_restore_sync_state_marks_snapshot_synced_when_system_time_is_valid);
+  RUN_TEST(test_restore_sync_state_throttles_ntp_within_24_hours);
+  RUN_TEST(test_restore_sync_state_does_not_throttle_ntp_for_future_timestamp);
+  RUN_TEST(test_restore_sync_state_does_not_mark_synced_when_system_time_is_invalid);
   RUN_TEST(test_sensor_service_retries_after_transient_read_failure);
   RUN_TEST(test_sensor_service_rejects_invalid_crc_payload);
   return UNITY_END();

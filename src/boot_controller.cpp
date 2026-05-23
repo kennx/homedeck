@@ -101,7 +101,11 @@ BootControllerDeps makeDefaultBootControllerDeps() {
   static HomeRenderer homeRenderer;
 
   BootControllerDeps deps;
-  deps.m5Begin = []() { M5.begin(); };
+  deps.m5Begin = []() {
+    auto cfg = M5.config();
+    cfg.serial_baudrate = 115200;
+    M5.begin(cfg);
+  };
   deps.m5Update = []() { M5.update(); };
   deps.areSetupButtonsPressed = []() {
     return M5.BtnA.isPressed() && M5.BtnB.isPressed();

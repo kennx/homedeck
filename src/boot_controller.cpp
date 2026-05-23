@@ -241,6 +241,16 @@ void BootController::begin() {
     config_ = deps_.loadSetupConfig();
   }
 
+  const esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
+  const bool isTimerWakeup = (wakeupCause == ESP_SLEEP_WAKEUP_TIMER);
+
+  if (isTimerWakeup) {
+    // 快速唤醒路径
+    enterHomeModeFast(config_);
+    return;
+  }
+
+  // 冷启动路径（保持原有逻辑）
   const homedeck::BootTarget target = homedeck::decideBootTarget({
       hasSavedConfig(config_),
       deps_.areSetupButtonsPressed ? deps_.areSetupButtonsPressed() : false,
@@ -340,6 +350,47 @@ void BootController::enterHomeMode(const homedeck::SetupConfig& config) {
   }
 
   refreshHomeScreen();
+}
+
+void BootController::enterHomeModeFast(const homedeck::SetupConfig& config) {
+  accessPointMode_ = false;
+  wifiConnected_ = false;
+  networkCycleStarted_ = true;
+  lastNetworkCycleAtMs_ = 0;
+  activeCalendarDate_.clear();
+  personalCalendar_ = ParsedPersonalCalendar{};
+  personalCalendarAvailable_ = false;
+  personalCalendarFresh_ = false;
+  holidayCalendar_ = ParsedHolidayCalendar{};
+  holidayCalendarAvailable_ = false;
+  holidayCalendarFresh_ = false;
+  sensorSnapshot_ = SensorSnapshot{};
+  sensorSampled_ = false;
+  lastSensorSampleAtMs_ = 0;
+  lastNetworkAttemptAtMs_ = 0;
+  lastModelHash_ = 0;
+
+  // 从 RTC 内存恢复传感器状态
+  restoreStateFromRtcMemory();
+  if (sensorSnapshot_.available) {
+    sensorSampled_ = true;
+  }
+
+  // 仍然调用 timeBegin（耗时很小，确保时区正确）
+  if (deps_.timeBegin) {
+    const std::string timezonePosix = resolveTimezonePosix(config.timezoneIana);
+    deps_.timeBegin(timezonePosix.c_str(), config.ntpServer.c_str());
+  }
+
+  // 传感器初始化仍然需要（I2C 状态在 deep sleep 后丢失）
+  if (deps_.sensorBegin) {
+    deps_.sensorBegin();
+  }
+
+  const TimeSnapshot snapshot = deps_.timeSnapshot ? deps_.timeSnapshot() : TimeSnapshot{};
+  if (snapshot.timeValid) {
+    syncCalendarStateForSnapshot(snapshot);
+  }
 }
 
 void BootController::refreshHomeScreen() {

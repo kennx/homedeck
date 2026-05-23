@@ -286,6 +286,13 @@ void BootController::update() {
     if (deps_.handleSetupPortalClient) {
       deps_.handleSetupPortalClient();
     }
+
+    const unsigned long now = deps_.millis ? deps_.millis() : 0;
+    if (now - apModeStartAtMs_ >= kApModeTimeoutMs) {
+#if !defined(UNIT_TEST)
+      ESP.restart();
+#endif
+    }
     return;
   }
 
@@ -299,6 +306,7 @@ void BootController::update() {
 
 void BootController::enterAccessPointMode(const homedeck::SetupConfig& config) {
   accessPointMode_ = true;
+  apModeStartAtMs_ = deps_.millis ? deps_.millis() : 0;
   const std::string apSsid = buildAccessPointSsid(
       deps_.makeAccessPointSuffix ? deps_.makeAccessPointSuffix()
                                   : std::string("000000"));

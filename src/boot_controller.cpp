@@ -12,18 +12,24 @@
 #include <Arduino.h>
 #include <M5Unified.h>
 #include <WiFi.h>
+#include <esp_sleep.h>
 
 #include "ap_config_portal.h"
 #include "config_store.h"
 #include "home_renderer.h"
 #include "setup_renderer.h"
+#else
+#include "support/fake_arduino/esp_sleep.h"
 #endif
 
 namespace {
 
-constexpr unsigned long kRefreshIntervalMs = 5UL * 60UL * 1000UL;
-constexpr unsigned long kSensorSampleIntervalMs = 5UL * 60UL * 1000UL;
+constexpr unsigned long kRefreshIntervalMs = 10UL * 60UL * 1000UL;
+constexpr unsigned long kSensorSampleIntervalMs = 10UL * 60UL * 1000UL;
 constexpr unsigned long kNetworkRetryIntervalMs = 60UL * 1000UL;
+constexpr unsigned long kApModeTimeoutMs = 10UL * 60UL * 1000UL;
+constexpr uint64_t kDeepSleepIntervalUs = 10ULL * 60ULL * 1000000ULL;
+constexpr uint32_t kRtcMemoryMagic = 0x48444543;  // "HDEC"
 
 std::string makeIsoTimestamp(const TimeSnapshot& snapshot) {
   return snapshot.dateText + " " + snapshot.timeText;
@@ -45,6 +51,26 @@ std::string buildAccessPointSsid(const std::string& suffix) {
 
 bool isSameDatePrefix(const std::string& cacheUpdatedAt, const std::string& dateText) {
   return !dateText.empty() && cacheUpdatedAt.rfind(dateText, 0) == 0;
+}
+
+RtcMemoryState gRtcState;
+
+void rtcMemoryWrite(const RtcMemoryState& state) {
+  gRtcState = state;
+}
+
+bool rtcMemoryRead(RtcMemoryState* state) {
+  if (state == nullptr) return false;
+  *state = gRtcState;
+  return gRtcState.magic == kRtcMemoryMagic;
+}
+
+uint32_t hashString(const std::string& s) {
+  uint32_t hash = 5381;
+  for (unsigned char c : s) {
+    hash = ((hash << 5) + hash) + c;
+  }
+  return hash;
 }
 
 }  // namespace
@@ -618,4 +644,44 @@ bool BootController::shouldRefreshHome(const TimeSnapshot& snapshot) const {
 
   const unsigned long now = deps_.millis ? deps_.millis() : 0;
   return now - lastRefreshAtMs_ >= kRefreshIntervalMs;
+}
+
+void BootController::saveStateToRtcMemory() {
+  RtcMemoryState state{};
+  state.magic = kRtcMemoryMagic;
+  state.wakeupCount = gRtcState.wakeupCount + 1;
+  state.lastNtpSyncAt = 0;  // 由 TimeService 内部维护，这里不需要重复保存
+  state.lastSensorAvailable = sensorSnapshot_.available;
+
+  std::snprintf(state.lastSensorTemp, sizeof(state.lastSensorTemp), "%s", sensorSnapshot_.temperatureText.c_str());
+  std::snprintf(state.lastSensorHumidity, sizeof(state.lastSensorHumidity), "%s", sensorSnapshot_.humidityText.c_str());
+
+  state.consecutiveNetworkFailures = 0;  // 每次成功完成周期后重置
+  state.isConfigured = hasSavedConfig(config_);
+
+  rtcMemoryWrite(state);
+}
+
+void BootController::restoreStateFromRtcMemory() {
+  RtcMemoryState state{};
+  if (!rtcMemoryRead(&state)) {
+    return;  // RTC 内存无效，使用默认值
+  }
+
+  gRtcState = state;
+  sensorSnapshot_.temperatureText = state.lastSensorTemp;
+  sensorSnapshot_.humidityText = state.lastSensorHumidity;
+  sensorSnapshot_.available = state.lastSensorAvailable;
+}
+
+void BootController::enterDeepSleep() {
+  if (accessPointMode_) {
+    return;
+  }
+
+  saveStateToRtcMemory();
+
+  esp_sleep_enable_timer_wakeup(kDeepSleepIntervalUs);
+  gpio_deep_sleep_hold_en();
+  esp_deep_sleep_start();
 }

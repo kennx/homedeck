@@ -44,7 +44,6 @@ class BootController {
   BootControllerDeps deps_;
   BootMode mode_ = BootMode::System;
   bool started_ = false;
-  unsigned long systemEnteredAtMs_ = 0;
   unsigned long setupButtonsPressedSinceMs_ = 0;
   bool setupButtonsWerePressed_ = false;
   bool setupShortcutConsumed_ = false;

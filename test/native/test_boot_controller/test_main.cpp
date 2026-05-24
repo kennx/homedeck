@@ -83,7 +83,7 @@ void test_configured_boot_renders_home() {
   TEST_ASSERT_EQUAL(homedeck::BootMode::System, controller.mode());
 }
 
-void test_ab_held_for_three_seconds_requests_config_reboot() {
+void test_ab_held_for_five_seconds_requests_config_reboot() {
   Fixture f{};
   f.configured = true;
   homedeck::BootController controller{f.deps()};
@@ -92,7 +92,7 @@ void test_ab_held_for_three_seconds_requests_config_reboot() {
   f.buttonsPressed = true;
   f.now = 100;
   controller.update();
-  f.now = 3100;
+  f.now = 5100;
   controller.update();
 
   TEST_ASSERT_TRUE(f.forceFlagWritten);
@@ -119,7 +119,7 @@ void test_ab_release_resets_hold_timer() {
   TEST_ASSERT_FALSE(f.restarted);
 }
 
-void test_ab_after_five_second_window_does_not_trigger() {
+void test_ab_held_after_startup_window_requests_config_reboot() {
   Fixture f{};
   f.configured = true;
   homedeck::BootController controller{f.deps()};
@@ -128,11 +128,11 @@ void test_ab_after_five_second_window_does_not_trigger() {
   f.now = 6000;
   f.buttonsPressed = true;
   controller.update();
-  f.now = 9000;
+  f.now = 11000;
   controller.update();
 
-  TEST_ASSERT_FALSE(f.forceFlagWritten);
-  TEST_ASSERT_FALSE(f.restarted);
+  TEST_ASSERT_TRUE(f.forceFlagWritten);
+  TEST_ASSERT_TRUE(f.restarted);
 }
 
 void test_config_mode_update_handles_portal_client() {
@@ -150,9 +150,9 @@ int main(int, char**) {
   RUN_TEST(test_first_boot_enters_config_mode);
   RUN_TEST(test_force_config_flag_is_consumed_once);
   RUN_TEST(test_configured_boot_renders_home);
-  RUN_TEST(test_ab_held_for_three_seconds_requests_config_reboot);
+  RUN_TEST(test_ab_held_for_five_seconds_requests_config_reboot);
   RUN_TEST(test_ab_release_resets_hold_timer);
-  RUN_TEST(test_ab_after_five_second_window_does_not_trigger);
+  RUN_TEST(test_ab_held_after_startup_window_requests_config_reboot);
   RUN_TEST(test_config_mode_update_handles_portal_client);
   return UNITY_END();
 }

@@ -5,8 +5,7 @@
 namespace homedeck {
 namespace {
 
-constexpr unsigned long kSetupShortcutWindowMs = 5000;
-constexpr unsigned long kSetupShortcutHoldMs = 3000;
+constexpr unsigned long kSetupShortcutHoldMs = 5000;
 
 }  // namespace
 
@@ -65,7 +64,6 @@ void BootController::enterConfigMode() {
 
 void BootController::enterSystemMode() {
   mode_ = BootMode::System;
-  systemEnteredAtMs_ = deps_.millis ? deps_.millis() : 0;
   setupButtonsPressedSinceMs_ = 0;
   setupButtonsWerePressed_ = false;
   setupShortcutConsumed_ = false;
@@ -82,10 +80,6 @@ void BootController::updateSetupShortcut(unsigned long now) {
   if (setupShortcutConsumed_) {
     return;
   }
-  if (now - systemEnteredAtMs_ > kSetupShortcutWindowMs) {
-    return;
-  }
-
   const bool pressed = deps_.areSetupButtonsPressed && deps_.areSetupButtonsPressed();
   if (!pressed) {
     setupButtonsWerePressed_ = false;

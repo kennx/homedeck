@@ -33,6 +33,10 @@ std::string makeApSsid() {
   return std::string("HomeDeck-") + suffix;
 }
 
+std::string softApIpAddress() {
+  return WiFi.softAPIP().toString().c_str();
+}
+
 bool connectWifi(const std::string& ssid, const std::string& password) {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid.c_str(), password.c_str());
@@ -102,7 +106,9 @@ BootControllerDeps makeBootDeps() {
   deps.clearForceConfigOnNextBoot = []() { return gConfigStore.clearForceConfigOnNextBoot(); };
   deps.setForceConfigOnNextBoot = []() { return gConfigStore.setForceConfigOnNextBoot(true); };
   deps.startConfigPortal = []() {
-    gConfigPortal.begin(makeApSsid(), gConfigStore.loadSetupConfig(), saveSubmittedConfig);
+    const std::string apSsid = makeApSsid();
+    gConfigPortal.begin(apSsid, gConfigStore.loadSetupConfig(), saveSubmittedConfig);
+    gHomeRenderer.renderConfigPortal(apSsid, softApIpAddress());
   };
   deps.handleConfigPortalClient = []() { gConfigPortal.handleClient(); };
   deps.restoreSystemTimeFromRtc = []() { gTimeService->restoreSystemTimeFromRtc(); };

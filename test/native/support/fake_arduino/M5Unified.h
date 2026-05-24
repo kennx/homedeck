@@ -166,6 +166,8 @@ struct FakePrintedText {
   int size = 1;
   FakeFontKind fontKind = FakeFontKind::kDefault;
   std::string text;
+  std::uint32_t color = TFT_BLACK;
+  std::uint32_t background = TFT_WHITE;
 };
 
 struct FakeRect {
@@ -289,7 +291,7 @@ struct FakeDisplay {
   }
 
   void print(const char* text) {
-    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : ""});
+    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
     cursorX += textWidth(text);
   }
 
@@ -435,7 +437,7 @@ struct FakeDisplay {
   void drawString(const char* text, int x, int y) {
     cursorX = x;
     cursorY = y;
-    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : ""});
+    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
   }
 
   void setEpdMode(int) {
@@ -455,6 +457,8 @@ struct FakeCanvas {
   FakeFontKind fontKind = FakeFontKind::kDefault;
   int lineStartX = 0;
   int colorDepth = 16;
+  std::uint32_t textColor = TFT_BLACK;
+  std::uint32_t textBackground = TFT_WHITE;
   textdatum_t textDatum = textdatum_t::top_left;
   std::vector<FakePrintedText> prints;
   std::vector<FakeRect> rects;
@@ -492,6 +496,8 @@ struct FakeCanvas {
   }
 
   void setTextColor(std::uint32_t fg, std::uint32_t bg) {
+    textColor = fg;
+    textBackground = bg;
     if (parent != nullptr) {
       parent->textColor = fg;
       parent->textBackground = bg;
@@ -547,7 +553,7 @@ struct FakeCanvas {
   }
 
   void print(const char* text) {
-    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : ""});
+    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
     cursorX += textWidth(text);
   }
 
@@ -606,7 +612,7 @@ struct FakeCanvas {
   void drawString(const char* text, int x, int y) {
     cursorX = x;
     cursorY = y;
-    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : ""});
+    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
   }
 
   void pushSprite(int x, int y) {

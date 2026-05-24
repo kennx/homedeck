@@ -294,7 +294,7 @@ void HomeRenderer::render(const HomeCalendarData& data) {
   }
 
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
-    canvas.setTextColor(kGreenColor, TFT_WHITE);
+    canvas.setTextColor(themeColor, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_center);
 
     std::string lunarLine = data.lunarDate;
@@ -304,10 +304,10 @@ void HomeRenderer::render(const HomeCalendarData& data) {
     canvas.drawString(lunarLine.c_str(), kCalendarCenterX, kCalendarLunarTopY);
     canvas.drawString(data.ganzhi.c_str(), kCalendarCenterX, kCalendarGanzhiTopY);
 
-    canvas.drawRect(kTableLeftX, kTableTopY, kTableWidth, kTableHeight, kGreenColor);
-    canvas.drawFastHLine(kTableLeftX, kTableRow1BottomY, kTableWidth, kGreenColor);
-    canvas.drawFastHLine(kTableLeftX, kTableRow2BottomY, kTableWidth, kGreenColor);
-    canvas.drawFastHLine(kTableLeftX, kTableYiBottomY, kTableWidth, kGreenColor);
+    canvas.drawRect(kTableLeftX, kTableTopY, kTableWidth, kTableHeight, themeColor);
+    canvas.drawFastHLine(kTableLeftX, kTableRow1BottomY, kTableWidth, themeColor);
+    canvas.drawFastHLine(kTableLeftX, kTableRow2BottomY, kTableWidth, themeColor);
+    canvas.drawFastHLine(kTableLeftX, kTableYiBottomY, kTableWidth, themeColor);
 
     canvas.setTextDatum(textdatum_t::top_left);
     canvas.drawString(data.wuxing.c_str(), kTableTextLeftX, kTableRow1TextY);

@@ -20,6 +20,7 @@ constexpr int kIpTextCenterY = 218;
 constexpr int kQrLeft = 72;
 constexpr int kQrTop = 258;
 constexpr int kQrSize = 256;
+constexpr std::uint32_t kHolidayColor = 0xF800;
 
 homedeck::HomeCalendarData figmaCalendarData() {
   return {
@@ -182,6 +183,25 @@ void test_home_renderer_wraps_unspaced_chinese_text_by_character() {
   TEST_ASSERT_TRUE(foundWrappedLine);
 }
 
+void test_home_renderer_uses_red_for_all_holiday_text_and_table_lines() {
+  auto data = figmaCalendarData();
+  data.weekday = "星期日";
+  data.isHoliday = true;
+  homedeck::HomeRenderer renderer;
+
+  renderer.render(data);
+
+  TEST_ASSERT_GREATER_THAN(0, static_cast<int>(M5.Display.prints.size()));
+  for (const auto& print : M5.Display.prints) {
+    TEST_ASSERT_EQUAL_UINT32(kHolidayColor, print.color);
+  }
+
+  TEST_ASSERT_GREATER_THAN(0, static_cast<int>(M5.Display.rects.size()));
+  for (const auto& rect : M5.Display.rects) {
+    TEST_ASSERT_EQUAL_UINT32(kHolidayColor, rect.color);
+  }
+}
+
 void test_home_renderer_draws_config_portal_layout() {
   homedeck::HomeRenderer renderer;
 
@@ -226,6 +246,7 @@ int main(int, char**) {
   RUN_TEST(test_home_calendar_data_uses_supplied_local_date);
   RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);
   RUN_TEST(test_home_renderer_wraps_unspaced_chinese_text_by_character);
+  RUN_TEST(test_home_renderer_uses_red_for_all_holiday_text_and_table_lines);
   RUN_TEST(test_home_renderer_draws_config_portal_layout);
   return UNITY_END();
 }

@@ -12,7 +12,6 @@ constexpr int kLogoLeft = 52;
 constexpr int kLogoTop = 86;
 constexpr int kLogoWidth = 297;
 constexpr int kLogoHeight = 40;
-constexpr int kHomeLogoTop = 280;
 constexpr int kApTextCenterY = 165;
 constexpr int kIpTextCenterY = 218;
 constexpr int kQrLeft = 72;
@@ -40,24 +39,79 @@ void setUp() {
 void tearDown() {
 }
 
-void test_home_renderer_draws_centered_logo_in_portrait() {
+void test_home_renderer_draws_lunar_calendar_portrait() {
   homedeck::HomeRenderer renderer;
 
   renderer.render();
 
   TEST_ASSERT_EQUAL(0, M5.Display.rotation);
   TEST_ASSERT_EQUAL(TFT_WHITE, M5.Display.fillScreenColor);
-  TEST_ASSERT_EQUAL(0, static_cast<int>(M5.Display.prints.size()));
-  TEST_ASSERT_EQUAL(1, static_cast<int>(M5.Display.pngDraws.size()));
+  TEST_ASSERT_EQUAL(0, static_cast<int>(M5.Display.pngDraws.size()));
   TEST_ASSERT_EQUAL(1, static_cast<int>(M5.Display.spritePushes.size()));
-  TEST_ASSERT_EQUAL_STRING("/logo.png", M5.Display.pngDraws[0].path.c_str());
-  TEST_ASSERT_EQUAL(kLogoLeft, M5.Display.pngDraws[0].x);
-  TEST_ASSERT_EQUAL(kHomeLogoTop, M5.Display.pngDraws[0].y);
-  TEST_ASSERT_EQUAL(kLogoWidth, M5.Display.pngDraws[0].maxWidth);
-  TEST_ASSERT_EQUAL(kLogoHeight, M5.Display.pngDraws[0].maxHeight);
-  TEST_ASSERT_EQUAL(static_cast<int>(datum_t::top_left), M5.Display.pngDraws[0].datum);
-  TEST_ASSERT_EQUAL(0, M5.Display.directPngDrawCount);
-  TEST_ASSERT_EQUAL(1, M5.Display.waitDisplayCount);
+
+  // 验证年、月、周的文本及位置
+  bool foundYear = false;
+  bool foundMonth = false;
+  bool foundWeekday = false;
+  bool foundDay = false;
+  bool foundLunar = false;
+  bool foundGanzhi = false;
+
+  for (const auto& print : M5.Display.prints) {
+    if (print.text == "2026 年") {
+      TEST_ASSERT_EQUAL(12, print.x);
+      TEST_ASSERT_EQUAL(24, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceDefault), static_cast<int>(print.fontKind));
+      foundYear = true;
+    } else if (print.text == "十二月") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(24, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceDefault), static_cast<int>(print.fontKind));
+      foundMonth = true;
+    } else if (print.text == "星期五") {
+      TEST_ASSERT_EQUAL(388, print.x);
+      TEST_ASSERT_EQUAL(24, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceDefault), static_cast<int>(print.fontKind));
+      foundWeekday = true;
+    } else if (print.text == "21") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(64, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceLargeDate), static_cast<int>(print.fontKind));
+      foundDay = true;
+    } else if (print.text == "四月初六 小满") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(242, print.y);
+      foundLunar = true;
+    } else if (print.text == "丙午年 癸巳月 丁酉日 鸡日") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(278, print.y);
+      foundGanzhi = true;
+    }
+  }
+
+  TEST_ASSERT_TRUE(foundYear);
+  TEST_ASSERT_TRUE(foundMonth);
+  TEST_ASSERT_TRUE(foundWeekday);
+  TEST_ASSERT_TRUE(foundDay);
+  TEST_ASSERT_TRUE(foundLunar);
+  TEST_ASSERT_TRUE(foundGanzhi);
+
+  // 验证网格边框和线条的绘制
+  bool foundTableBorder = false;
+  int internalLineCount = 0;
+
+  for (const auto& rect : M5.Display.rects) {
+    if (rect.x == 12 && rect.y == 320 && rect.w == 376 && rect.h == 268) {
+      foundTableBorder = true;
+    } else if (rect.x == 12 && rect.w == 376 && rect.h == 1) {
+      if (rect.y == 362 || rect.y == 404 || rect.y == 514) {
+        internalLineCount++;
+      }
+    }
+  }
+
+  TEST_ASSERT_TRUE(foundTableBorder);
+  TEST_ASSERT_EQUAL(3, internalLineCount);
 }
 
 void test_home_renderer_draws_config_portal_layout() {
@@ -101,7 +155,7 @@ void test_home_renderer_draws_config_portal_layout() {
 
 int main(int, char**) {
   UNITY_BEGIN();
-  RUN_TEST(test_home_renderer_draws_centered_logo_in_portrait);
+  RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);
   RUN_TEST(test_home_renderer_draws_config_portal_layout);
   return UNITY_END();
 }

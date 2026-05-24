@@ -25,6 +25,7 @@ enum class FakeFontKind {
   kDeviceMetric = 3,
   kDeviceTime = 4,
   kConfigPortal = 5,
+  kDeviceLargeDate = 6,
 };
 
 namespace m5 {
@@ -198,7 +199,11 @@ enum class datum_t {
 
 enum class textdatum_t {
   top_left = 0,
-  middle_center = 1,
+  top_center = 1,
+  top_right = 2,
+  middle_left = 3,
+  middle_center = 4,
+  middle_right = 5,
 };
 
 struct FakeDisplay {
@@ -232,6 +237,9 @@ struct FakeDisplay {
     }
     if (kind == FakeFontKind::kDeviceTime) {
       return 42;
+    }
+    if (kind == FakeFontKind::kDeviceLargeDate) {
+      return 156;
     }
     return 14;
   }
@@ -327,6 +335,10 @@ struct FakeDisplay {
       return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 21 : 42;
     }
 
+    if (kind == FakeFontKind::kDeviceLargeDate) {
+      return 78;
+    }
+
     if (leadByte < 0x80 || (leadByte & 0xE0) == 0xC0) {
       return 9;
     }
@@ -343,10 +355,14 @@ struct FakeDisplay {
       fontKind = FakeFontKind::kDefault;
     } else if (font == homedeck::generated::kConfigPortalFontVlw) {
       fontKind = FakeFontKind::kConfigPortal;
-    } else if (font[0] == 28) {
+    } else if (font == homedeck::generated::kDeviceLargeDateFontVlw) {
+      fontKind = FakeFontKind::kDeviceLargeDate;
+    } else if (font == homedeck::generated::kDeviceMetricFontVlw) {
       fontKind = FakeFontKind::kDeviceMetric;
-    } else if (font[0] == 42) {
+    } else if (font == homedeck::generated::kDeviceTimeFontVlw) {
       fontKind = FakeFontKind::kDeviceTime;
+    } else if (font == homedeck::generated::kDeviceFontVlw) {
+      fontKind = FakeFontKind::kDeviceDefault;
     } else {
       fontKind = FakeFontKind::kDeviceDefault;
     }
@@ -396,6 +412,10 @@ struct FakeDisplay {
   void fillRect(int x, int y, int w, int h, std::uint32_t color) {
     ++directRectCount;
     rects.push_back({x, y, w, h, color});
+  }
+
+  void drawFastHLine(int32_t x, int32_t y, int32_t w, std::uint32_t color) {
+    rects.push_back({x, y, w, 1, color});
   }
 
   void startWrite() {
@@ -570,6 +590,10 @@ struct FakeCanvas {
 
   void fillRect(int x, int y, int w, int h, std::uint32_t color) {
     rects.push_back({x, y, w, h, color});
+  }
+
+  void drawFastHLine(int32_t x, int32_t y, int32_t w, std::uint32_t color) {
+    rects.push_back({x, y, w, 1, color});
   }
 
   void setTextDatum(textdatum_t value) {

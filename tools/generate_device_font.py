@@ -8,12 +8,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BODY_FONT = ROOT / "fonts" / "misans" / "NotoSansSC-SemiBold.ttf"
+BODY_FONT = ROOT / "fonts" / "misans" / "MiSans-Semibold.ttf"
 METRIC_FONT = ROOT / "fonts" / "misans" / "MiSans-Bold.ttf"
 TIME_FONT = ROOT / "fonts" / "misans" / "MiSans-Heavy.ttf"
+CONFIG_FONT = ROOT / "fonts" / "misans" / "MiSans-Semibold.ttf"
 BODY_PIXEL_SIZE = 18
 METRIC_PIXEL_SIZE = 28
 TIME_PIXEL_SIZE = 42
+CONFIG_PIXEL_SIZE = 20
 MIN_GLYPH_COUNT = 6000
 BUILD_DIR = ROOT / ".pio" / "build" / "font-tools"
 ENCODER_PATH = BUILD_DIR / "font_to_vlw"
@@ -230,7 +232,7 @@ namespace homedeck::generated {{
 
 
 def main() -> None:
-    for font_path in (BODY_FONT, METRIC_FONT, TIME_FONT):
+    for font_path in (BODY_FONT, METRIC_FONT, TIME_FONT, CONFIG_FONT):
         if not font_path.exists():
             raise SystemExit(f"source font missing: {font_path}")
 
@@ -242,6 +244,10 @@ def main() -> None:
 
     numeric_codepoints: set[int] = set()
     collect_text(numeric_codepoints, NUMERIC_TEXT, non_ascii_only=False)
+
+    config_codepoints: set[int] = set()
+    collect_ascii(config_codepoints)
+
     resources = [
         FontResource("device_font", "kDevice", BODY_PIXEL_SIZE, body_codepoints, BODY_FONT),
         FontResource(
@@ -257,6 +263,13 @@ def main() -> None:
             TIME_PIXEL_SIZE,
             sorted(numeric_codepoints),
             TIME_FONT,
+        ),
+        FontResource(
+            "config_portal_font",
+            "kConfigPortal",
+            CONFIG_PIXEL_SIZE,
+            sorted(config_codepoints),
+            CONFIG_FONT,
         ),
     ]
 

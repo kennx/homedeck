@@ -555,11 +555,13 @@ struct FakeM5Global {
   FakeButton BtnB;
   FakeLed Led;
   FakePower Power;
+  int updateCount = 0;
 
   void begin() {
   }
 
   void update() {
+    ++updateCount;
   }
 };
 

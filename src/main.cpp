@@ -1,9 +1,9 @@
-#include <M5Unified.h>
+#include "app_runtime.h"
 
 void setup() {
-    M5.begin();
+    homedeck::appSetup();
 }
 
 void loop() {
-    M5.update();
+    homedeck::appLoop();
 }

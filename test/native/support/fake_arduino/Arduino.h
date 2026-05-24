@@ -1,8 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 inline std::uint32_t gFakeMillis = 0;
+inline std::string gFakeTimezone;
+inline std::string gFakeNtpServer;
+
+inline void configTzTime(const char* timezone, const char* server) {
+  gFakeTimezone = timezone != nullptr ? timezone : "";
+  gFakeNtpServer = server != nullptr ? server : "";
+}
 inline void (*gFakeDelayCallback)(unsigned long) = nullptr;
 
 // Native host keeps unsigned long at the platform ABI width (64-bit on Darwin),

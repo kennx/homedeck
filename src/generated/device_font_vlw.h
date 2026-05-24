@@ -11,9 +11,9 @@ inline constexpr std::uint32_t kDeviceFontGlyphCount = 7541U;
 inline constexpr std::uint32_t kDeviceFontPixelSize = 20U;
 
 extern const std::uint8_t kDeviceLargeDateFontVlw[];
-inline constexpr std::size_t kDeviceLargeDateFontVlwSize = 184777U;
+inline constexpr std::size_t kDeviceLargeDateFontVlwSize = 49205U;
 inline constexpr std::uint32_t kDeviceLargeDateFontGlyphCount = 19U;
-inline constexpr std::uint32_t kDeviceLargeDateFontPixelSize = 156U;
+inline constexpr std::uint32_t kDeviceLargeDateFontPixelSize = 80U;
 
 extern const std::uint8_t kDeviceMetricFontVlw[];
 inline constexpr std::size_t kDeviceMetricFontVlwSize = 6561U;

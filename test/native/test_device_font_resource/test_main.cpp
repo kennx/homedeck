@@ -10,7 +10,7 @@ void test_generated_font_metadata_is_present() {
   // Assertions for the new large date font
   TEST_ASSERT_GREATER_THAN_UINT32(9U, homedeck::generated::kDeviceLargeDateFontGlyphCount);
   TEST_ASSERT_GREATER_THAN_UINT32(1024U, homedeck::generated::kDeviceLargeDateFontVlwSize);
-  TEST_ASSERT_EQUAL_UINT32(156U, homedeck::generated::kDeviceLargeDateFontPixelSize);
+  TEST_ASSERT_EQUAL_UINT32(80U, homedeck::generated::kDeviceLargeDateFontPixelSize);
 }
 
 void test_config_portal_font_uses_misans_semibold_20px_ascii_subset() {

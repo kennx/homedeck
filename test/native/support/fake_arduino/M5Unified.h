@@ -239,7 +239,7 @@ struct FakeDisplay {
       return 42;
     }
     if (kind == FakeFontKind::kDeviceLargeDate) {
-      return 156;
+      return 80;
     }
     return 14;
   }
@@ -336,7 +336,7 @@ struct FakeDisplay {
     }
 
     if (kind == FakeFontKind::kDeviceLargeDate) {
-      return 78;
+      return 40;
     }
 
     if (leadByte < 0x80 || (leadByte & 0xE0) == 0xC0) {

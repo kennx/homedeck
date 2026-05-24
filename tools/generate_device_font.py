@@ -253,7 +253,7 @@ def main() -> None:
         FontResource(
             "device_large_date_font",
             "kDeviceLargeDate",
-            156,
+            80,
             sorted(numeric_codepoints),
             TIME_FONT,
         ),

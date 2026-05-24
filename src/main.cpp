@@ -1,18 +1,9 @@
-#include <Arduino.h>
-
-#include "boot_controller.h"
-
-namespace {
-
-BootController gBootController;
-
-}  // namespace
+#include <M5Unified.h>
 
 void setup() {
-  gBootController.begin();
+    M5.begin();
 }
 
 void loop() {
-  gBootController.update();
-  gBootController.enterDeepSleep();
+    M5.update();
 }

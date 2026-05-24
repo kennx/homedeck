@@ -76,6 +76,7 @@ void test_home_renderer_draws_lunar_calendar_portrait() {
     } else if (print.text == "21") {
       TEST_ASSERT_EQUAL(200, print.x);
       TEST_ASSERT_EQUAL(64, print.y);
+      TEST_ASSERT_EQUAL(2, print.size);
       TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceLargeDate), static_cast<int>(print.fontKind));
       foundDay = true;
     } else if (print.text == "四月初六 小满") {

@@ -199,11 +199,13 @@ void HomeRenderer::render() {
     canvas.unloadFont();
   }
 
-  // --- 第二行：大数字 156px (Y = 64px) ---
+  // --- 第二行：大数字 156px (Y = 64px，字号 78px x 2) ---
   if (canvas.loadFont(generated::kDeviceLargeDateFontVlw)) {
     canvas.setTextColor(themeColor, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_center);
+    canvas.setTextSize(2);
     canvas.drawString(data.day.c_str(), 200, 64);
+    canvas.setTextSize(1);
     canvas.unloadFont();
   }
 
@@ -245,15 +247,15 @@ void HomeRenderer::render() {
     canvas.setTextDatum(textdatum_t::middle_right);
     canvas.drawString(data.taishen.c_str(), 376, 383);
 
-    // 第三子行：宜 (Y: 404 - 514)
+    // 第三子行：宜 (Y: 404 - 514，上内边距 12px)
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.drawString("宜", 24, 420);
-    drawWrappedText(canvas, data.yi, 72, 420, 304, 28);
+    canvas.drawString("宜", 24, 416);
+    drawWrappedText(canvas, data.yi, 72, 416, 304, 28);
 
-    // 第四子行：忌 (Y: 514 - 588)
+    // 第四子行：忌 (Y: 514 - 588，上内边距 12px)
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.drawString("忌", 24, 530);
-    drawWrappedText(canvas, data.ji, 72, 530, 304, 28);
+    canvas.drawString("忌", 24, 526);
+    drawWrappedText(canvas, data.ji, 72, 526, 304, 28);
 
     canvas.unloadFont();
   }

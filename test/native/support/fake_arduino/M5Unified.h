@@ -179,7 +179,16 @@ struct FakePngDraw {
   std::string path;
   int x = 0;
   int y = 0;
+  int maxWidth = 0;
+  int maxHeight = 0;
   int datum = 0;
+};
+
+struct FakeSpritePush {
+  int x = 0;
+  int y = 0;
+  int w = 0;
+  int h = 0;
 };
 
 enum class datum_t {
@@ -209,6 +218,10 @@ struct FakeDisplay {
   std::vector<FakePrintedText> prints;
   std::vector<FakeRect> rects;
   std::vector<FakePngDraw> pngDraws;
+  std::vector<FakeSpritePush> spritePushes;
+  int directRectCount = 0;
+  int directPngDrawCount = 0;
+  int waitDisplayCount = 0;
 
   static int lineHeightFor(FakeFontKind kind) {
     if (kind == FakeFontKind::kDefault) {
@@ -350,14 +363,15 @@ struct FakeDisplay {
       const char* path,
       int x,
       int y,
-      int,
-      int,
+      int maxWidth,
+      int maxHeight,
       int,
       int,
       float,
       float,
       datum_t datum) {
-    pngDraws.push_back({path != nullptr ? path : "", x, y, static_cast<int>(datum)});
+    ++directPngDrawCount;
+    pngDraws.push_back({path != nullptr ? path : "", x, y, maxWidth, maxHeight, static_cast<int>(datum)});
     return true;
   }
 
@@ -380,6 +394,7 @@ struct FakeDisplay {
   }
 
   void fillRect(int x, int y, int w, int h, std::uint32_t color) {
+    ++directRectCount;
     rects.push_back({x, y, w, h, color});
   }
 
@@ -390,6 +405,7 @@ struct FakeDisplay {
   }
 
   void waitDisplay() {
+    ++waitDisplayCount;
   }
 
   void setTextDatum(textdatum_t value) {
@@ -418,6 +434,11 @@ struct FakeCanvas {
   int textSize = 1;
   FakeFontKind fontKind = FakeFontKind::kDefault;
   int lineStartX = 0;
+  int colorDepth = 16;
+  textdatum_t textDatum = textdatum_t::top_left;
+  std::vector<FakePrintedText> prints;
+  std::vector<FakeRect> rects;
+  std::vector<FakePngDraw> pngDraws;
 
   explicit FakeCanvas(FakeDisplay* display) : parent(display) {
   }
@@ -444,6 +465,10 @@ struct FakeCanvas {
     if (parent != nullptr) {
       parent->fillScreenColor = color;
     }
+  }
+
+  void setColorDepth(int depth) {
+    colorDepth = depth;
   }
 
   void setTextColor(std::uint32_t fg, std::uint32_t bg) {
@@ -484,6 +509,13 @@ struct FakeCanvas {
     return true;
   }
 
+  void unloadFont() {
+    fontKind = FakeFontKind::kDefault;
+    if (parent != nullptr) {
+      parent->fontKind = FakeFontKind::kDefault;
+    }
+  }
+
   void setCursor(int x, int y) {
     cursorX = x;
     cursorY = y;
@@ -495,11 +527,7 @@ struct FakeCanvas {
   }
 
   void print(const char* text) {
-    if (parent != nullptr) {
-      parent->cursorX = cursorX;
-      parent->cursorY = cursorY;
-      parent->prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : ""});
-    }
+    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : ""});
     cursorX += textWidth(text);
   }
 
@@ -537,18 +565,34 @@ struct FakeCanvas {
   }
 
   void drawRect(int x, int y, int w, int h, std::uint32_t color) {
-    if (parent != nullptr) {
-      parent->rects.push_back({x, y, w, h, color});
-    }
+    rects.push_back({x, y, w, h, color});
   }
 
   void fillRect(int x, int y, int w, int h, std::uint32_t color) {
+    rects.push_back({x, y, w, h, color});
+  }
+
+  void setTextDatum(textdatum_t value) {
+    textDatum = value;
     if (parent != nullptr) {
-      parent->rects.push_back({x, y, w, h, color});
+      parent->textDatum = value;
     }
   }
 
-  void pushSprite(int, int) {
+  void drawString(const char* text, int x, int y) {
+    cursorX = x;
+    cursorY = y;
+    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : ""});
+  }
+
+  void pushSprite(int x, int y) {
+    if (parent == nullptr) {
+      return;
+    }
+    parent->spritePushes.push_back({x, y, spriteWidth, spriteHeight});
+    parent->prints.insert(parent->prints.end(), prints.begin(), prints.end());
+    parent->rects.insert(parent->rects.end(), rects.begin(), rects.end());
+    parent->pngDraws.insert(parent->pngDraws.end(), pngDraws.begin(), pngDraws.end());
   }
 
   template <typename TFs>
@@ -557,14 +601,20 @@ struct FakeCanvas {
       const char* path,
       int x,
       int y,
-      int a,
-      int b,
+      int maxWidth,
+      int maxHeight,
       int c,
       int d,
       float e,
       float f,
       datum_t datum) {
-    return parent != nullptr && parent->drawPngFile(fs, path, x, y, a, b, c, d, e, f, datum);
+    (void)fs;
+    (void)c;
+    (void)d;
+    (void)e;
+    (void)f;
+    pngDraws.push_back({path != nullptr ? path : "", x, y, maxWidth, maxHeight, static_cast<int>(datum)});
+    return true;
   }
 };
 

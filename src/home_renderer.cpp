@@ -14,8 +14,8 @@ namespace homedeck {
 namespace {
 
 constexpr int kLogoTopY = 86;
+constexpr int kLogoWidth = 297;
 constexpr int kLogoHeight = 40;
-constexpr int kLogoCenterY = kLogoTopY + kLogoHeight / 2;
 constexpr int kTextFrameHeight = 27;
 constexpr int kApTextTopY = kLogoTopY + kLogoHeight + 26;
 constexpr int kApTextCenterY = kApTextTopY + kTextFrameHeight / 2;
@@ -29,61 +29,52 @@ int centerX() {
   return M5.Display.width() / 2;
 }
 
-void drawLogo(int y) {
+int logoLeftX() {
+  return (M5.Display.width() - kLogoWidth + 1) / 2;
+}
+
+void drawLogo(M5Canvas& canvas, int top) {
   if (!LittleFS.begin()) {
     return;
   }
-  M5.Display.drawPngFile(
+  canvas.drawPngFile(
       LittleFS,
       "/logo.png",
-      centerX(),
-      y,
-      0,
-      0,
+      logoLeftX(),
+      top,
+      kLogoWidth,
+      kLogoHeight,
       0,
       0,
       1.0f,
       1.0f,
-      datum_t::middle_center);
+      datum_t::top_left);
   LittleFS.end();
 }
 
-void prepareScreen() {
+void prepareScreen(M5Canvas& canvas) {
   M5.Display.setRotation(0);
-  M5.Display.fillScreen(TFT_WHITE);
-  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.setTextDatum(textdatum_t::middle_center);
+  canvas.setColorDepth(16);
+  canvas.createSprite(M5.Display.width(), M5.Display.height());
+  canvas.fillSprite(TFT_WHITE);
+  canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+  canvas.setTextDatum(textdatum_t::middle_center);
 }
 
-void loadConfigPortalFont() {
-  if (!M5.Display.loadFont(generated::kConfigPortalFontVlw)) {
-    M5.Display.setFont(nullptr);
+void pushScreen(M5Canvas& canvas) {
+  canvas.pushSprite(0, 0);
+  canvas.deleteSprite();
+  M5.Display.waitDisplay();
+}
+
+void loadConfigPortalFont(M5Canvas& canvas) {
+  if (!canvas.loadFont(generated::kConfigPortalFontVlw)) {
+    canvas.setFont(nullptr);
   }
-  M5.Display.setTextSize(1);
+  canvas.setTextSize(1);
 }
 
-}  // namespace
-
-void HomeRenderer::render() {
-  prepareScreen();
-  drawLogo(M5.Display.height() / 2);
-}
-
-void HomeRenderer::renderConfigPortal(const std::string& apSsid, const std::string& ipAddress) {
-  prepareScreen();
-
-  drawLogo(kLogoCenterY);
-
-  loadConfigPortalFont();
-  M5.Display.drawString(apSsid.c_str(), centerX(), kApTextCenterY);
-  M5.Display.drawString(ipAddress.c_str(), centerX(), kIpTextCenterY);
-  M5.Display.unloadFont();
-
-  const std::string qrText = std::string("WIFI:T:nopass;S:") + apSsid + ";;";
-  drawQrCode(qrText, kQrLeftX, kQrTopY, kQrSize);
-}
-
-void HomeRenderer::drawQrCode(const std::string& text, int left, int top, int size) {
+void drawQrCode(M5Canvas& canvas, const std::string& text, int left, int top, int size) {
   QRCode qrcode;
   std::vector<std::uint8_t> qrcodeBuffer(qrcode_getBufferSize(3));
   qrcode_initText(&qrcode, qrcodeBuffer.data(), 3, ECC_LOW, text.c_str());
@@ -98,7 +89,7 @@ void HomeRenderer::drawQrCode(const std::string& text, int left, int top, int si
       const int moduleTop = top + y * size / qrcode.size;
       const int moduleRight = left + (x + 1) * size / qrcode.size;
       const int moduleBottom = top + (y + 1) * size / qrcode.size;
-      M5.Display.fillRect(
+      canvas.fillRect(
           moduleLeft,
           moduleTop,
           moduleRight - moduleLeft,
@@ -106,6 +97,31 @@ void HomeRenderer::drawQrCode(const std::string& text, int left, int top, int si
           TFT_BLACK);
     }
   }
+}
+
+}  // namespace
+
+void HomeRenderer::render() {
+  M5Canvas canvas(&M5.Display);
+  prepareScreen(canvas);
+  drawLogo(canvas, (M5.Display.height() - kLogoHeight) / 2);
+  pushScreen(canvas);
+}
+
+void HomeRenderer::renderConfigPortal(const std::string& apSsid, const std::string& ipAddress) {
+  M5Canvas canvas(&M5.Display);
+  prepareScreen(canvas);
+
+  drawLogo(canvas, kLogoTopY);
+
+  loadConfigPortalFont(canvas);
+  canvas.drawString(apSsid.c_str(), centerX(), kApTextCenterY);
+  canvas.drawString(ipAddress.c_str(), centerX(), kIpTextCenterY);
+  canvas.unloadFont();
+
+  const std::string qrText = std::string("WIFI:T:nopass;S:") + apSsid + ";;";
+  drawQrCode(canvas, qrText, kQrLeftX, kQrTopY, kQrSize);
+  pushScreen(canvas);
 }
 
 }  // namespace homedeck

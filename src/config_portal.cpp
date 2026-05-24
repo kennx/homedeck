@@ -12,6 +12,8 @@ namespace homedeck {
 namespace {
 
 constexpr std::uint16_t kDnsPort = 53;
+const IPAddress kSoftApIp{192, 168, 4, 1};
+const IPAddress kSoftApSubnet{255, 255, 255, 0};
 
 }  // namespace
 
@@ -25,11 +27,12 @@ void ConfigPortal::begin(
   restartScheduled_ = false;
   restartAtMs_ = 0;
 
-  networks_ = selectTopWifiNetworks(scanWifiNetworks(), 5);
-
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAPConfig(kSoftApIp, kSoftApIp, kSoftApSubnet);
   WiFi.softAP(apSsid_.c_str());
   delay(100);
+
+  networks_ = selectTopWifiNetworks(scanWifiNetworks(), 5);
 
   dnsServer_.start(kDnsPort, "*", WiFi.softAPIP());
 

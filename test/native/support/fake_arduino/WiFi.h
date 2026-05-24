@@ -14,7 +14,13 @@ struct IPAddress {
   int b = 168;
   int c = 4;
   int d = 1;
-  std::string toString() const { return "192.168.4.1"; }
+  IPAddress() = default;
+  IPAddress(int first, int second, int third, int fourth)
+      : a(first), b(second), c(third), d(fourth) {}
+  std::string toString() const {
+    return std::to_string(a) + "." + std::to_string(b) + "." + std::to_string(c) + "." +
+        std::to_string(d);
+  }
 };
 
 struct FakeWifiNetwork {
@@ -25,9 +31,13 @@ struct FakeWifiNetwork {
 struct FakeWiFiClass {
   int modeValue = 0;
   bool softApStarted = false;
+  bool softApConfigCalled = false;
   std::string apSsid;
   std::string staSsid;
   std::string staPassword;
+  IPAddress apLocalIp{};
+  IPAddress apGateway{};
+  IPAddress apSubnet{255, 255, 255, 0};
   int statusValue = WL_CONNECTED;
   std::vector<FakeWifiNetwork> scanResults;
 
@@ -38,7 +48,14 @@ struct FakeWiFiClass {
     apSsid = ssid != nullptr ? ssid : "";
     return true;
   }
-  IPAddress softAPIP() const { return IPAddress{}; }
+  bool softAPConfig(IPAddress localIp, IPAddress gateway, IPAddress subnet, IPAddress = IPAddress{}) {
+    softApConfigCalled = true;
+    apLocalIp = localIp;
+    apGateway = gateway;
+    apSubnet = subnet;
+    return true;
+  }
+  IPAddress softAPIP() const { return apLocalIp; }
   int scanNetworks() { return static_cast<int>(scanResults.size()); }
   std::string SSID(int index) const { return scanResults[index].ssid; }
   int32_t RSSI(int index) const { return scanResults[index].rssi; }

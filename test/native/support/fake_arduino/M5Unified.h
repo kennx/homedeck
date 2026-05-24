@@ -324,7 +324,7 @@ struct FakeDisplay {
     }
 
     if (kind == FakeFontKind::kDeviceDefault) {
-      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 7 : 14;
+      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 10 : 20;
     }
 
     if (kind == FakeFontKind::kDeviceMetric) {

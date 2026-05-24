@@ -202,6 +202,41 @@ void test_home_renderer_uses_red_for_all_holiday_text_and_table_lines() {
   }
 }
 
+void test_home_renderer_shrinks_yi_ji_rows_when_content_is_single_line() {
+  auto data = figmaCalendarData();
+  data.yi = "出行";
+  data.ji = "结婚";
+  homedeck::HomeRenderer renderer;
+
+  renderer.render(data);
+
+  bool foundTableBorder = false;
+  bool foundDynamicDivider = false;
+  bool foundJiLabel = false;
+  bool foundJiContent = false;
+  for (const auto& rect : M5.Display.rects) {
+    if (rect.x == 12 && rect.y == 293 && rect.w == 376 && rect.h == 188) {
+      foundTableBorder = true;
+    }
+    if (rect.x == 12 && rect.y == 434 && rect.w == 376 && rect.h == 1) {
+      foundDynamicDivider = true;
+    }
+  }
+  for (const auto& print : M5.Display.prints) {
+    if (print.text == "忌" && print.y == 444) {
+      foundJiLabel = true;
+    }
+    if (print.text == "结" && print.y == 444) {
+      foundJiContent = true;
+    }
+  }
+
+  TEST_ASSERT_TRUE(foundTableBorder);
+  TEST_ASSERT_TRUE(foundDynamicDivider);
+  TEST_ASSERT_TRUE(foundJiLabel);
+  TEST_ASSERT_TRUE(foundJiContent);
+}
+
 void test_home_renderer_draws_config_portal_layout() {
   homedeck::HomeRenderer renderer;
 
@@ -247,6 +282,7 @@ int main(int, char**) {
   RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);
   RUN_TEST(test_home_renderer_wraps_unspaced_chinese_text_by_character);
   RUN_TEST(test_home_renderer_uses_red_for_all_holiday_text_and_table_lines);
+  RUN_TEST(test_home_renderer_shrinks_yi_ji_rows_when_content_is_single_line);
   RUN_TEST(test_home_renderer_draws_config_portal_layout);
   return UNITY_END();
 }

@@ -36,10 +36,8 @@ constexpr int kCalendarGanzhiTopY = 254;
 constexpr int kTableLeftX = 12;
 constexpr int kTableTopY = 293;
 constexpr int kTableWidth = 376;
-constexpr int kTableHeight = 242;
 constexpr int kTableRow1BottomY = 340;
 constexpr int kTableRow2BottomY = 387;
-constexpr int kTableYiBottomY = 488;
 constexpr int kTableTextLeftX = 22;
 constexpr int kTableTextRightX = 378;
 constexpr int kTableContentLeftX = 62;
@@ -47,8 +45,9 @@ constexpr int kTableContentWidth = 316;
 constexpr int kTableRow1TextY = 303;
 constexpr int kTableRow2TextY = 350;
 constexpr int kTableYiTextY = 397;
-constexpr int kTableJiTextY = 498;
 constexpr int kTableLineHeight = 27;
+constexpr int kTableRowPaddingY = 10;
+constexpr int kTableFixedRowHeight = 47;
 
 // 供配置界面（Config Portal）渲染 Logo 使用的方法保留
 int centerX() {
@@ -181,6 +180,49 @@ void drawWrappedText(M5Canvas& canvas, const std::string& text, int startX, int 
   }
 }
 
+int wrappedLineCount(M5Canvas& canvas, const std::string& text, int maxWidth) {
+  int lineCount = 1;
+  int currentWidth = 0;
+
+  for (std::size_t index = 0; index < text.size();) {
+    std::size_t length = utf8CodePointLength(static_cast<unsigned char>(text[index]));
+    if (index + length > text.size()) {
+      length = 1;
+    }
+
+    std::string glyph = text.substr(index, length);
+    index += length;
+
+    if (glyph == "\n") {
+      ++lineCount;
+      currentWidth = 0;
+      continue;
+    }
+    if (glyph == " " && currentWidth == 0) {
+      continue;
+    }
+
+    const int glyphWidth = canvas.textWidth(glyph.c_str());
+    if (currentWidth > 0 && currentWidth + glyphWidth > maxWidth) {
+      ++lineCount;
+      currentWidth = 0;
+      if (glyph == " ") {
+        continue;
+      }
+    }
+
+    currentWidth += glyphWidth;
+  }
+
+  return lineCount;
+}
+
+int dynamicActionRowHeight(M5Canvas& canvas, const std::string& text) {
+  const int contentHeight = wrappedLineCount(canvas, text, kTableContentWidth) * kTableLineHeight
+      + kTableRowPaddingY * 2;
+  return contentHeight > kTableFixedRowHeight ? contentHeight : kTableFixedRowHeight;
+}
+
 const char* chineseMonthName(int monthIndex) {
   static constexpr const char* kMonths[] = {
       "一月",
@@ -304,10 +346,18 @@ void HomeRenderer::render(const HomeCalendarData& data) {
     canvas.drawString(lunarLine.c_str(), kCalendarCenterX, kCalendarLunarTopY);
     canvas.drawString(data.ganzhi.c_str(), kCalendarCenterX, kCalendarGanzhiTopY);
 
-    canvas.drawRect(kTableLeftX, kTableTopY, kTableWidth, kTableHeight, themeColor);
+    const int yiRowTop = kTableRow2BottomY;
+    const int yiRowHeight = dynamicActionRowHeight(canvas, data.yi);
+    const int yiRowBottomY = yiRowTop + yiRowHeight;
+    const int jiRowTop = yiRowBottomY;
+    const int jiTextY = jiRowTop + kTableRowPaddingY;
+    const int jiRowHeight = dynamicActionRowHeight(canvas, data.ji);
+    const int tableHeight = kTableFixedRowHeight * 2 + yiRowHeight + jiRowHeight;
+
+    canvas.drawRect(kTableLeftX, kTableTopY, kTableWidth, tableHeight, themeColor);
     canvas.drawFastHLine(kTableLeftX, kTableRow1BottomY, kTableWidth, themeColor);
     canvas.drawFastHLine(kTableLeftX, kTableRow2BottomY, kTableWidth, themeColor);
-    canvas.drawFastHLine(kTableLeftX, kTableYiBottomY, kTableWidth, themeColor);
+    canvas.drawFastHLine(kTableLeftX, yiRowBottomY, kTableWidth, themeColor);
 
     canvas.setTextDatum(textdatum_t::top_left);
     canvas.drawString(data.wuxing.c_str(), kTableTextLeftX, kTableRow1TextY);
@@ -328,8 +378,8 @@ void HomeRenderer::render(const HomeCalendarData& data) {
     canvas.drawString("宜", kTableTextLeftX, kTableYiTextY);
     drawWrappedText(canvas, data.yi, kTableContentLeftX, kTableYiTextY, kTableContentWidth, kTableLineHeight);
 
-    canvas.drawString("忌", kTableTextLeftX, kTableJiTextY);
-    drawWrappedText(canvas, data.ji, kTableContentLeftX, kTableJiTextY, kTableContentWidth, kTableLineHeight);
+    canvas.drawString("忌", kTableTextLeftX, jiTextY);
+    drawWrappedText(canvas, data.ji, kTableContentLeftX, jiTextY, kTableContentWidth, kTableLineHeight);
 
     canvas.unloadFont();
   }

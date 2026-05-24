@@ -547,4 +547,4 @@ struct FakeM5Global {
   }
 };
 
-extern FakeM5Global M5;
+inline FakeM5Global M5;

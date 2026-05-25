@@ -299,3 +299,122 @@ def unpack_record(
         yi=yi,
         ji=ji,
     )
+
+
+def _require_lunar_python():
+    try:
+        from lunar_python import Solar  # type: ignore
+    except ImportError as exc:
+        raise SystemExit(
+            "lunar_python==1.4.8 is required. Run: "
+            "python3 -m pip install -r tools/requirements-almanac.txt"
+        ) from exc
+    return Solar
+
+
+def _join_without_spaces(prefix: str, value: str) -> str:
+    return prefix + value.replace(" ", "")
+
+
+def _lunar_date_text(lunar) -> str:
+    month = lunar.getMonthInChinese()
+    if lunar.getMonth() < 0 and not month.startswith("闰"):
+        month = "闰" + month
+    if not month.endswith("月"):
+        month += "月"
+    return month + lunar.getDayInChinese()
+
+
+def build_day(solar_date: date) -> AlmanacDay:
+    Solar = _require_lunar_python()
+    lunar = Solar.fromYmd(solar_date.year, solar_date.month, solar_date.day).getLunar()
+    ganzhi = (
+        f"{lunar.getYearInGanZhi()}年 "
+        f"{lunar.getMonthInGanZhi()}月 "
+        f"{lunar.getDayInGanZhi()}日 "
+        f"{lunar.getDayShengXiao()}日"
+    )
+    return AlmanacDay(
+        solar_date=solar_date,
+        lunar_date=_lunar_date_text(lunar),
+        solar_term=lunar.getJieQi(),
+        ganzhi=ganzhi,
+        wuxing="五行" + lunar.getDayNaYin(),
+        chongsha=f"冲{lunar.getDayChongShengXiao()}煞{lunar.getDaySha()}",
+        zhishen="值神" + lunar.getDayTianShen(),
+        jianchu="建除" + lunar.getZhiXing() + "日",
+        taishen=_join_without_spaces("胎神", lunar.getDayPositionTai()),
+        yi=tuple(lunar.getDayYi()),
+        ji=tuple(lunar.getDayJi()),
+    )
+
+
+def iter_dates(start: date, end: date) -> Iterable[date]:
+    current = start
+    while current <= end:
+        yield current
+        current += timedelta(days=1)
+
+
+def build_days(start: date = START_DATE, end: date = END_DATE) -> list[AlmanacDay]:
+    return [build_day(current) for current in iter_dates(start, end)]
+
+
+def write_package(path: Path, days: Sequence[AlmanacDay]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(build_almanac_package(days))
+
+
+def verify_golden() -> None:
+    golden_dates = (
+        date(2026, 12, 21),
+        date(2026, 2, 17),
+        date(2025, 7, 25),
+        date(2026, 5, 21),
+        date(2026, 3, 3),
+    )
+    for value in golden_dates:
+        day = build_day(value)
+        if not day.lunar_date or not day.ganzhi or not day.yi or not day.ji:
+            raise SystemExit(f"golden date produced incomplete data: {value}")
+
+
+def _output_path(path: Path) -> Path:
+    return path if path.is_absolute() else ROOT / path
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Generate HomeDeck offline almanac data.")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--verify-golden", action="store_true")
+    args = parser.parse_args(argv)
+
+    if args.verify_golden:
+        verify_golden()
+
+    days = build_days()
+    if len(days) != EXPECTED_DAY_COUNT:
+        raise SystemExit(f"expected {EXPECTED_DAY_COUNT} days, generated {len(days)}")
+
+    output_path = _output_path(args.output)
+    write_package(output_path, days)
+    package = output_path.read_bytes()
+    header = unpack_header(package)
+    print(f"Generated {_display_path(output_path)}")
+    print(f"Date range: {header.start_date}..{header.end_date}")
+    print(f"Days: {header.day_count}")
+    print(f"Record size: {header.record_size}")
+    print(f"Strings: {header.string_count}")
+    print(f"Bytes: {len(package)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

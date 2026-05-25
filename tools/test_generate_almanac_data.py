@@ -164,6 +164,60 @@ class AlmanacPackageFormatTest(unittest.TestCase):
         string_mutation[-1] ^= 0x01
         self.assertFalse(gen.verify_payload_crc(string_mutation, header))
 
+    def test_build_day_maps_figma_date_from_lunar_python(self) -> None:
+        day = gen.build_day(date(2026, 12, 21))
+
+        self.assertEqual("冬月十三", day.lunar_date)
+        self.assertEqual("", day.solar_term)
+        self.assertEqual("丙午年 庚子月 己巳日 蛇日", day.ganzhi)
+        self.assertEqual("五行大林木", day.wuxing)
+        self.assertEqual("冲猪煞东", day.chongsha)
+        self.assertEqual("值神玄武", day.zhishen)
+        self.assertEqual("建除执日", day.jianchu)
+        self.assertEqual("胎神占门床外正南", day.taishen)
+        self.assertEqual(
+            (
+                "嫁娶",
+                "冠笄",
+                "祭祀",
+                "祈福",
+                "求嗣",
+                "斋醮",
+                "进人口",
+                "会亲友",
+                "伐木",
+                "作梁",
+                "开柱眼",
+                "安床",
+                "掘井",
+                "捕捉",
+                "畋猎",
+            ),
+            day.yi,
+        )
+        self.assertEqual(("开生坟", "破土", "行丧", "安葬"), day.ji)
+
+    def test_build_day_covers_new_year_leap_month_solar_term_and_regular_day(self) -> None:
+        lunar_new_year = gen.build_day(date(2026, 2, 17))
+        leap_month = gen.build_day(date(2025, 7, 25))
+        solar_term = gen.build_day(date(2026, 5, 21))
+        regular = gen.build_day(date(2026, 3, 3))
+
+        self.assertEqual("正月初一", lunar_new_year.lunar_date)
+        self.assertEqual("丙午年 庚寅月 壬戌日 狗日", lunar_new_year.ganzhi)
+        self.assertEqual("胎神仓库栖外东南", lunar_new_year.taishen)
+
+        self.assertEqual("闰六月初一", leap_month.lunar_date)
+        self.assertEqual("乙巳年 癸未月 乙未日 羊日", leap_month.ganzhi)
+
+        self.assertEqual("四月初五", solar_term.lunar_date)
+        self.assertEqual("小满", solar_term.solar_term)
+        self.assertEqual("值神明堂", solar_term.zhishen)
+
+        self.assertEqual("正月十五", regular.lunar_date)
+        self.assertEqual("建除开日", regular.jianchu)
+        self.assertEqual(("移徙", "入宅", "出火", "安门", "安葬"), regular.ji)
+
 
 if __name__ == "__main__":
     unittest.main()

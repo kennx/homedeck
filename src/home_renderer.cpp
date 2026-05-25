@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "almanac_provider.h"
 #include "generated/device_font_vlw.h"
 
 namespace homedeck {
@@ -279,6 +280,32 @@ std::tm fallbackLocalTime() {
   return local;
 }
 
+void applyMissingAlmanac(HomeCalendarData& data) {
+  data.lunarDate = "数据缺失";
+  data.solarTerm = "";
+  data.ganzhi = "黄历数据缺失";
+  data.wuxing = "五行暂无";
+  data.chongsha = "冲煞暂无";
+  data.zhishen = "值神暂无";
+  data.jianchu = "建除暂无";
+  data.taishen = "胎神暂无";
+  data.yi = "暂无";
+  data.ji = "暂无";
+}
+
+void applyAlmanac(HomeCalendarData& data, const AlmanacDayData& almanac) {
+  data.lunarDate = almanac.lunarDate;
+  data.solarTerm = almanac.solarTerm;
+  data.ganzhi = almanac.ganzhi;
+  data.wuxing = almanac.wuxing;
+  data.chongsha = almanac.chongsha;
+  data.zhishen = almanac.zhishen;
+  data.jianchu = almanac.jianchu;
+  data.taishen = almanac.taishen;
+  data.yi = almanac.yi.empty() ? "暂无" : almanac.yi;
+  data.ji = almanac.ji.empty() ? "暂无" : almanac.ji;
+}
+
 }  // namespace
 
 HomeCalendarData makeHomeCalendarData(const std::tm& localTime) {
@@ -289,15 +316,15 @@ HomeCalendarData makeHomeCalendarData(const std::tm& localTime) {
   data.day = formatDay(localTime.tm_mday);
   data.weekday = weekdayName(weekday);
   data.isHoliday = weekday == 0 || weekday == 6;
-  data.lunarDate = "农历待接入";
-  data.ganzhi = "黄历数据待接入";
-  data.wuxing = "五行暂无";
-  data.chongsha = "冲煞暂无";
-  data.zhishen = "值神暂无";
-  data.jianchu = "建除暂无";
-  data.taishen = "胎神暂无";
-  data.yi = "暂无";
-  data.ji = "暂无";
+
+  AlmanacProvider provider;
+  AlmanacDayData almanac{};
+  if (provider.lookup(localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, &almanac)) {
+    applyAlmanac(data, almanac);
+  } else {
+    applyMissingAlmanac(data);
+  }
+
   return data;
 }
 

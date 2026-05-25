@@ -1,11 +1,13 @@
 #include <unity.h>
 
+#include <LittleFS.h>
 #include <M5Unified.h>
 #include <qrcode.h>
 
 #include <ctime>
 #include <string>
 
+#include "../support/almanac_fixture.h"
 #include "home_renderer.h"
 
 namespace {
@@ -54,7 +56,35 @@ void assertRectsInsideQrBounds() {
 
 }  // namespace
 
-void test_home_calendar_data_uses_supplied_local_date() {
+void test_home_calendar_data_uses_almanac_package_when_available() {
+  fakeLittleFSSetFile("/almanac.bin", homedeck::test::buildSingleDayFixturePackage());
+
+  std::tm local{};
+  local.tm_year = 1900 - 1900;
+  local.tm_mon = 0;
+  local.tm_mday = 1;
+  local.tm_wday = 1;
+
+  const auto data = homedeck::makeHomeCalendarData(local);
+
+  TEST_ASSERT_EQUAL_STRING("1900 年", data.year.c_str());
+  TEST_ASSERT_EQUAL_STRING("一月", data.month.c_str());
+  TEST_ASSERT_EQUAL_STRING("1", data.day.c_str());
+  TEST_ASSERT_EQUAL_STRING("星期一", data.weekday.c_str());
+  TEST_ASSERT_FALSE(data.isHoliday);
+  TEST_ASSERT_EQUAL_STRING("腊月初一", data.lunarDate.c_str());
+  TEST_ASSERT_EQUAL_STRING("", data.solarTerm.c_str());
+  TEST_ASSERT_EQUAL_STRING("己亥年 丙子月 甲子日 鼠日", data.ganzhi.c_str());
+  TEST_ASSERT_EQUAL_STRING("五行海中金", data.wuxing.c_str());
+  TEST_ASSERT_EQUAL_STRING("冲马煞南", data.chongsha.c_str());
+  TEST_ASSERT_EQUAL_STRING("值神青龙", data.zhishen.c_str());
+  TEST_ASSERT_EQUAL_STRING("建除建日", data.jianchu.c_str());
+  TEST_ASSERT_EQUAL_STRING("胎神占门碓外东南", data.taishen.c_str());
+  TEST_ASSERT_EQUAL_STRING("祭祀 祈福", data.yi.c_str());
+  TEST_ASSERT_EQUAL_STRING("嫁娶", data.ji.c_str());
+}
+
+void test_home_calendar_data_keeps_public_date_when_almanac_missing() {
   std::tm local{};
   local.tm_year = 2030 - 1900;
   local.tm_mon = 8;
@@ -68,12 +98,21 @@ void test_home_calendar_data_uses_supplied_local_date() {
   TEST_ASSERT_EQUAL_STRING("8", data.day.c_str());
   TEST_ASSERT_EQUAL_STRING("星期日", data.weekday.c_str());
   TEST_ASSERT_TRUE(data.isHoliday);
+  TEST_ASSERT_EQUAL_STRING("数据缺失", data.lunarDate.c_str());
+  TEST_ASSERT_EQUAL_STRING("", data.solarTerm.c_str());
+  TEST_ASSERT_EQUAL_STRING("黄历数据缺失", data.ganzhi.c_str());
+  TEST_ASSERT_EQUAL_STRING("五行暂无", data.wuxing.c_str());
+  TEST_ASSERT_EQUAL_STRING("冲煞暂无", data.chongsha.c_str());
+  TEST_ASSERT_EQUAL_STRING("值神暂无", data.zhishen.c_str());
+  TEST_ASSERT_EQUAL_STRING("建除暂无", data.jianchu.c_str());
+  TEST_ASSERT_EQUAL_STRING("胎神暂无", data.taishen.c_str());
   TEST_ASSERT_EQUAL_STRING("暂无", data.yi.c_str());
   TEST_ASSERT_EQUAL_STRING("暂无", data.ji.c_str());
 }
 
 void setUp() {
   M5 = FakeM5Global{};
+  fakeLittleFSReset();
   gLastQrCodeText.clear();
 }
 
@@ -278,7 +317,8 @@ void test_home_renderer_draws_config_portal_layout() {
 
 int main(int, char**) {
   UNITY_BEGIN();
-  RUN_TEST(test_home_calendar_data_uses_supplied_local_date);
+  RUN_TEST(test_home_calendar_data_uses_almanac_package_when_available);
+  RUN_TEST(test_home_calendar_data_keeps_public_date_when_almanac_missing);
   RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);
   RUN_TEST(test_home_renderer_wraps_unspaced_chinese_text_by_character);
   RUN_TEST(test_home_renderer_uses_red_for_all_holiday_text_and_table_lines);

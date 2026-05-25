@@ -35,21 +35,37 @@ Binary format locked for this implementation:
 
 - Header is exactly 64 bytes.
 - Magic is `HDALM001`.
-- Format version is `1`.
+- Format version is `2`.
 - Date range is `1900-01-01` through `2100-12-31`, inclusive.
 - Day count is `73414`.
-- Payload CRC32 is computed over `records + string table`, not the header.
-- Record layout is fixed-size per package:
-  - 8 little-endian `uint32_t` string indexes: lunar date, solar term, ganzhi, wuxing, chongsha, zhishen, jianchu, taishen.
+- Payload CRC32 is computed over the full payload after the 64-byte header: `record offset table + records + string table`.
+- Header layout after `dayCount`:
+  - `uint8_t maxYiCount`.
+  - `uint8_t maxJiCount`.
+  - `uint16_t termCount`.
+  - `uint32_t recordOffsetsOffset`.
+  - `uint32_t recordsOffset`.
+  - `uint32_t stringTableOffset`.
+  - `uint32_t stringCount`.
+  - `uint32_t stringTableSize`.
+  - `uint32_t payloadCrc32`.
+  - `uint8_t recordOffsetSize`, fixed to `3`.
+  - Remaining header bytes are reserved zero.
+- Record offset table layout:
+  - `(dayCount + 1)` 3-byte little-endian unsigned offsets.
+  - Offsets are relative to `recordsOffset`.
+  - Final offset equals the records blob length.
+- Record layout is variable-size per day:
+  - 11 little-endian `uint16_t` string indexes: lunar date, solar term, year ganzhi, month ganzhi, day ganzhi, day shengxiao, wuxing, chongsha, zhishen, jianchu, taishen.
   - `uint8_t yiCount`.
   - `uint8_t jiCount`.
-  - `uint16_t reserved`.
-  - `maxYiCount` little-endian `uint32_t` string indexes.
-  - `maxJiCount` little-endian `uint32_t` string indexes.
+  - `yiCount` one-byte term IDs.
+  - `jiCount` one-byte term IDs.
 - String table layout:
   - `(stringCount + 1)` little-endian `uint32_t` offsets.
   - UTF-8 string blob with no null terminators.
   - index `0` is always the empty string.
+  - indexes `1..termCount` are the fixed yi/ji term dictionary; term ID `0` maps to string index `1`.
 
 Figma date note: `2026-12-21` is used as a golden date because it appears in the Figma frame, but its expected almanac text comes from `lunar-python`; the mock text in the design frame is visual sample content and is not treated as data truth.
 

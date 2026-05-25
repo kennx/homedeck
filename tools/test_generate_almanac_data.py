@@ -55,16 +55,21 @@ class AlmanacPackageFormatTest(unittest.TestCase):
         second = gen.unpack_record(package, header, 1, strings)
 
         self.assertEqual(gen.MAGIC, header.magic)
-        self.assertEqual(1, header.format_version)
+        self.assertEqual(2, header.format_version)
         self.assertEqual(64, header.header_size)
         self.assertEqual(date(1900, 1, 1), header.start_date)
         self.assertEqual(date(1900, 1, 2), header.end_date)
         self.assertEqual(2, header.day_count)
         self.assertEqual(2, header.max_yi_count)
         self.assertEqual(2, header.max_ji_count)
-        self.assertEqual(64, header.records_offset)
+        self.assertEqual(6, header.term_count)
+        self.assertEqual(64, header.record_offsets_offset)
+        self.assertEqual(73, header.records_offset)
+        self.assertEqual(127, header.string_table_offset)
+        self.assertEqual(3, header.record_offset_size)
         self.assertGreater(header.string_table_offset, header.records_offset)
         self.assertEqual("", strings[0])
+        self.assertEqual(("祭祀", "祈福", "嫁娶", "出行", "安葬", "开市"), tuple(strings[1:7]))
         self.assertEqual(days[0], first)
         self.assertEqual(days[1], second)
 
@@ -101,39 +106,44 @@ class AlmanacPackageFormatTest(unittest.TestCase):
         package = gen.build_almanac_package(days)
 
         self.assertEqual(gen.MAGIC, package[0:8])
-        self.assertEqual((1).to_bytes(2, "little"), package[8:10])
+        self.assertEqual((2).to_bytes(2, "little"), package[8:10])
         self.assertEqual((64).to_bytes(2, "little"), package[10:12])
         self.assertEqual((2).to_bytes(4, "little"), package[20:24])
-        self.assertEqual((52).to_bytes(2, "little"), package[24:26])
-        self.assertEqual(bytes((2, 2)), package[26:28])
+        self.assertEqual(bytes((2, 2)), package[24:26])
+        self.assertEqual((6).to_bytes(2, "little"), package[26:28])
         self.assertEqual((64).to_bytes(4, "little"), package[28:32])
-        self.assertEqual((168).to_bytes(4, "little"), package[32:36])
-        self.assertEqual((20).to_bytes(4, "little"), package[36:40])
+        self.assertEqual((73).to_bytes(4, "little"), package[32:36])
+        self.assertEqual((127).to_bytes(4, "little"), package[36:40])
+        self.assertEqual((24).to_bytes(4, "little"), package[40:44])
+        self.assertEqual(bytes((3,)), package[52:53])
+        self.assertEqual(bytes(11), package[53:64])
+        self.assertEqual(
+            b"".join(offset.to_bytes(3, "little") for offset in (0, 27, 54)),
+            package[64:73],
+        )
 
-        first_record = package[64:116]
-        expected_field_indexes = (1, 0, 2, 3, 4, 5, 6, 7)
+        first_record = package[73:100]
+        expected_field_indexes = (7, 0, 8, 9, 10, 11, 12, 13, 14, 15, 16)
         self.assertEqual(
-            b"".join(index.to_bytes(4, "little") for index in expected_field_indexes),
-            first_record[0:32],
+            b"".join(index.to_bytes(2, "little") for index in expected_field_indexes),
+            first_record[0:22],
         )
-        self.assertEqual(bytes((2, 1)), first_record[32:34])
-        self.assertEqual((0).to_bytes(2, "little"), first_record[34:36])
-        expected_list_indexes = (8, 9, 10, 0)
-        self.assertEqual(
-            b"".join(index.to_bytes(4, "little") for index in expected_list_indexes),
-            first_record[36:52],
-        )
+        self.assertEqual(bytes((2, 1)), first_record[22:24])
+        self.assertEqual(bytes((0, 1, 2)), first_record[24:27])
 
         first_string_offsets = (
             0,
             0,
-            len("腊月初一".encode("utf-8")),
-            len("腊月初一己亥年 丙子月 甲子日 鼠日".encode("utf-8")),
-            len("腊月初一己亥年 丙子月 甲子日 鼠日五行海中金".encode("utf-8")),
+            6,
+            12,
+            18,
+            24,
+            30,
+            36,
         )
         self.assertEqual(
             b"".join(offset.to_bytes(4, "little") for offset in first_string_offsets),
-            package[168:188],
+            package[127:159],
         )
 
     def test_crc_changes_when_payload_is_modified(self) -> None:
@@ -154,6 +164,13 @@ class AlmanacPackageFormatTest(unittest.TestCase):
         header = gen.unpack_header(record_mutation)
         self.assertTrue(gen.verify_payload_crc(record_mutation, header))
 
+        record_mutation[header.record_offsets_offset + header.record_offset_size] ^= 0x01
+        self.assertFalse(gen.verify_payload_crc(record_mutation, header))
+
+        record_mutation = bytearray(gen.build_almanac_package([day]))
+        header = gen.unpack_header(record_mutation)
+        self.assertTrue(gen.verify_payload_crc(record_mutation, header))
+
         record_mutation[header.records_offset] ^= 0x01
         self.assertFalse(gen.verify_payload_crc(record_mutation, header))
 
@@ -163,6 +180,38 @@ class AlmanacPackageFormatTest(unittest.TestCase):
 
         string_mutation[-1] ^= 0x01
         self.assertFalse(gen.verify_payload_crc(string_mutation, header))
+
+    def test_require_lunar_python_returns_expected_version(self) -> None:
+        self.assertEqual("1.4.8", gen.REQUIRED_LUNAR_PYTHON_VERSION)
+        self.assertTrue(hasattr(gen._require_lunar_python(), "fromYmd"))
+
+    def test_verify_golden_rejects_changed_field(self) -> None:
+        original_build_day = gen.build_day
+
+        def build_wrong_day(solar_date: date) -> gen.AlmanacDay:
+            day = original_build_day(solar_date)
+            if solar_date == date(2026, 12, 21):
+                return gen.AlmanacDay(
+                    solar_date=day.solar_date,
+                    lunar_date="冬十三",
+                    solar_term=day.solar_term,
+                    ganzhi=day.ganzhi,
+                    wuxing=day.wuxing,
+                    chongsha=day.chongsha,
+                    zhishen=day.zhishen,
+                    jianchu=day.jianchu,
+                    taishen=day.taishen,
+                    yi=day.yi,
+                    ji=day.ji,
+                )
+            return day
+
+        try:
+            gen.build_day = build_wrong_day  # type: ignore[assignment]
+            with self.assertRaises(SystemExit):
+                gen.verify_golden()
+        finally:
+            gen.build_day = original_build_day  # type: ignore[assignment]
 
     def test_build_day_maps_figma_date_from_lunar_python(self) -> None:
         day = gen.build_day(date(2026, 12, 21))

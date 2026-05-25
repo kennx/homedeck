@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import struct
 import zlib
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Sequence
+from pathlib import Path
+from typing import Iterable, Sequence
 
 
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT = ROOT / "data" / "almanac.bin"
 MAGIC = b"HDALM001"
 FORMAT_VERSION = 1
 HEADER_SIZE = 64

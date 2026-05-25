@@ -9,6 +9,14 @@
 
 namespace homedeck::test {
 
+constexpr int kCanonicalStartYear = 1900;
+constexpr int kCanonicalStartMonth = 1;
+constexpr int kCanonicalStartDay = 1;
+constexpr int kCanonicalEndYear = 2100;
+constexpr int kCanonicalEndMonth = 12;
+constexpr int kCanonicalEndDay = 31;
+constexpr std::uint32_t kCanonicalDayCount = 73414;
+
 struct AlmanacFixtureDay {
   std::string lunarDate;
   std::string solarTerm;
@@ -125,6 +133,19 @@ inline void addDays(int& year, int& month, int& day, std::size_t delta) {
   }
 }
 
+inline std::size_t daysFromCanonicalStart(int year, int month, int day) {
+  int currentYear = kCanonicalStartYear;
+  int currentMonth = kCanonicalStartMonth;
+  int currentDay = kCanonicalStartDay;
+  for (std::size_t offset = 0; offset < kCanonicalDayCount; ++offset) {
+    if (currentYear == year && currentMonth == month && currentDay == day) {
+      return offset;
+    }
+    addDays(currentYear, currentMonth, currentDay, 1);
+  }
+  throw std::runtime_error("fixture date is outside canonical almanac range");
+}
+
 inline std::vector<std::string> textFields(const AlmanacFixtureDay& day) {
   auto parts = splitGanzhi(day.ganzhi);
   return {
@@ -191,7 +212,11 @@ inline std::vector<std::uint8_t> buildAlmanacFixturePackage(
   }
 
   std::vector<std::uint8_t> records;
-  std::vector<std::uint32_t> recordOffsets{0};
+  const std::size_t startOffset = daysFromCanonicalStart(startYear, startMonth, startDay);
+  if (startOffset + days.size() > kCanonicalDayCount) {
+    throw std::runtime_error("fixture days exceed canonical almanac range");
+  }
+  std::vector<std::uint32_t> recordOffsets(startOffset + 1, 0);
   std::uint8_t maxYiCount = 0;
   std::uint8_t maxJiCount = 0;
   for (const auto& day : days) {
@@ -210,6 +235,7 @@ inline std::vector<std::uint8_t> buildAlmanacFixturePackage(
     }
     recordOffsets.push_back(static_cast<std::uint32_t>(records.size()));
   }
+  recordOffsets.resize(kCanonicalDayCount + 1, static_cast<std::uint32_t>(records.size()));
 
   std::vector<std::uint8_t> recordOffsetsBlob;
   for (const auto offset : recordOffsets) {
@@ -241,23 +267,18 @@ inline std::vector<std::uint8_t> buildAlmanacFixturePackage(
   payload.insert(payload.end(), stringTable.begin(), stringTable.end());
   const std::uint32_t payloadCrc = crc32(payload.data(), payload.size());
 
-  int endYear = startYear;
-  int endMonth = startMonth;
-  int endDay = startDay;
-  addDays(endYear, endMonth, endDay, days.size() - 1);
-
   std::vector<std::uint8_t> package;
   const char magic[] = "HDALM001";
   package.insert(package.end(), magic, magic + 8);
   pushU16(package, 2);
   pushU16(package, kHeaderSize);
-  pushI16(package, static_cast<std::int16_t>(startYear));
-  package.push_back(static_cast<std::uint8_t>(startMonth));
-  package.push_back(static_cast<std::uint8_t>(startDay));
-  pushI16(package, static_cast<std::int16_t>(endYear));
-  package.push_back(static_cast<std::uint8_t>(endMonth));
-  package.push_back(static_cast<std::uint8_t>(endDay));
-  pushU32(package, static_cast<std::uint32_t>(days.size()));
+  pushI16(package, static_cast<std::int16_t>(kCanonicalStartYear));
+  package.push_back(static_cast<std::uint8_t>(kCanonicalStartMonth));
+  package.push_back(static_cast<std::uint8_t>(kCanonicalStartDay));
+  pushI16(package, static_cast<std::int16_t>(kCanonicalEndYear));
+  package.push_back(static_cast<std::uint8_t>(kCanonicalEndMonth));
+  package.push_back(static_cast<std::uint8_t>(kCanonicalEndDay));
+  pushU32(package, kCanonicalDayCount);
   package.push_back(maxYiCount);
   package.push_back(maxJiCount);
   pushU16(package, static_cast<std::uint16_t>(terms.size()));

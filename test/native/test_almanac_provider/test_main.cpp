@@ -131,6 +131,21 @@ void test_bad_format_version_returns_false() {
   TEST_ASSERT_FALSE(provider.lookup(1900, 1, 1, &out));
 }
 
+void test_header_date_drift_returns_false_even_with_valid_payload_crc() {
+  auto package = homedeck::test::buildSingleDayFixturePackage();
+  writeU16(package, 12, 1901);
+  package[14] = 1;
+  package[15] = 1;
+  writeU16(package, 16, 2101);
+  package[18] = 12;
+  package[19] = 31;
+  installPackage(package);
+  homedeck::AlmanacProvider provider;
+  homedeck::AlmanacDayData out{};
+
+  TEST_ASSERT_FALSE(provider.lookup(1901, 1, 1, &out));
+}
+
 void test_bad_payload_crc_returns_false() {
   auto package = homedeck::test::buildSingleDayFixturePackage();
   package.back() ^= 0x01;
@@ -247,6 +262,7 @@ int main(int, char**) {
   RUN_TEST(test_out_of_range_dates_return_false);
   RUN_TEST(test_bad_magic_returns_false);
   RUN_TEST(test_bad_format_version_returns_false);
+  RUN_TEST(test_header_date_drift_returns_false_even_with_valid_payload_crc);
   RUN_TEST(test_bad_payload_crc_returns_false);
   RUN_TEST(test_corrupted_offset_table_returns_false);
   RUN_TEST(test_record_body_mutation_without_crc_update_returns_false);

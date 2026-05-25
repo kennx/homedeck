@@ -19,6 +19,13 @@ constexpr std::uint16_t kHeaderSize = 64;
 constexpr std::uint8_t kTextFieldCount = 11;
 constexpr std::uint8_t kRecordOffsetSize = 3;
 constexpr std::uint32_t kStringIndexSize = 4;
+constexpr int kCanonicalStartYear = 1900;
+constexpr std::uint8_t kCanonicalStartMonth = 1;
+constexpr std::uint8_t kCanonicalStartDay = 1;
+constexpr int kCanonicalEndYear = 2100;
+constexpr std::uint8_t kCanonicalEndMonth = 12;
+constexpr std::uint8_t kCanonicalEndDay = 31;
+constexpr std::uint32_t kCanonicalDayCount = 73414;
 
 struct AlmanacHeader {
   std::int16_t startYear = 0;
@@ -159,6 +166,15 @@ bool readHeader(File& file, AlmanacHeader& header) {
   }
   if (!isValidDate(header.startYear, header.startMonth, header.startDay) ||
       !isValidDate(header.endYear, header.endMonth, header.endDay)) {
+    return false;
+  }
+  if (header.startYear != kCanonicalStartYear ||
+      header.startMonth != kCanonicalStartMonth ||
+      header.startDay != kCanonicalStartDay ||
+      header.endYear != kCanonicalEndYear ||
+      header.endMonth != kCanonicalEndMonth ||
+      header.endDay != kCanonicalEndDay ||
+      header.dayCount != kCanonicalDayCount) {
     return false;
   }
 

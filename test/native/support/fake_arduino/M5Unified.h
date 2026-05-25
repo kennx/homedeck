@@ -93,6 +93,12 @@ struct FakeI2C {
   bool failNextRead = false;
   std::array<std::uint8_t, 256> registers{};
   std::array<std::uint8_t, 6> nextReadBuffer{};
+  std::uint8_t lastAddress = 0;
+  bool lastReadMode = false;
+  std::uint32_t lastFrequency = 0;
+  int startCalls = 0;
+  int stopCalls = 0;
+  std::vector<std::uint8_t> writtenBytes;
 
   bool isEnabled() const {
     return enabled;
@@ -102,15 +108,24 @@ struct FakeI2C {
     return scanFound;
   }
 
-  bool start(std::uint8_t, bool, std::uint32_t) {
+  bool start(std::uint8_t address, bool read, std::uint32_t frequency) {
+    ++startCalls;
+    lastAddress = address;
+    lastReadMode = read;
+    lastFrequency = frequency;
     return enabled;
   }
 
-  bool write(std::uint8_t) {
-    return enabled;
+  bool write(std::uint8_t value) {
+    if (!enabled) {
+      return false;
+    }
+    writtenBytes.push_back(value);
+    return true;
   }
 
   bool stop() {
+    ++stopCalls;
     return enabled;
   }
 

@@ -23,7 +23,7 @@ constexpr int kQrLeft = 72;
 constexpr int kQrTop = 258;
 constexpr int kQrSize = 256;
 constexpr std::uint32_t kHolidayColor = 0xF800;
-constexpr int kEnvironmentTextTopY = 574;
+constexpr int kEnvironmentTextBottomY = 588;
 constexpr std::uint32_t kWeekdayColor = 0x0449;
 
 homedeck::HomeCalendarData figmaCalendarData() {
@@ -321,14 +321,16 @@ void test_home_renderer_draws_environment_readings_at_bottom_edges() {
   for (const auto& print : M5.Display.prints) {
     if (print.text == "30.0°C") {
       TEST_ASSERT_EQUAL(12, print.x);
-      TEST_ASSERT_EQUAL(kEnvironmentTextTopY, print.y);
+      TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_left), print.datum);
       TEST_ASSERT_EQUAL_UINT32(kWeekdayColor, print.color);
       TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceDefault), static_cast<int>(print.fontKind));
       foundTemperature = true;
     }
     if (print.text == "50.0%") {
       TEST_ASSERT_EQUAL(388, print.x);
-      TEST_ASSERT_EQUAL(kEnvironmentTextTopY, print.y);
+      TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_right), print.datum);
       TEST_ASSERT_EQUAL_UINT32(kWeekdayColor, print.color);
       TEST_ASSERT_EQUAL(static_cast<int>(FakeFontKind::kDeviceDefault), static_cast<int>(print.fontKind));
       foundHumidity = true;
@@ -350,12 +352,14 @@ void test_home_renderer_draws_environment_placeholders_when_unavailable() {
   for (const auto& print : M5.Display.prints) {
     if (print.text == "--.-°C") {
       TEST_ASSERT_EQUAL(12, print.x);
-      TEST_ASSERT_EQUAL(kEnvironmentTextTopY, print.y);
+      TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_left), print.datum);
       foundTemperature = true;
     }
     if (print.text == "--.-%") {
       TEST_ASSERT_EQUAL(388, print.x);
-      TEST_ASSERT_EQUAL(kEnvironmentTextTopY, print.y);
+      TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_right), print.datum);
       foundHumidity = true;
     }
   }

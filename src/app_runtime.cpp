@@ -4,6 +4,7 @@
 #include <ESP.h>
 #include <M5Unified.h>
 #include <WiFi.h>
+#include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include <time.h>
 
@@ -107,14 +108,35 @@ void renderHomeWithEnvironment() {
   gHomeRenderer.render(data);
 }
 
+}  // namespace
+
 void enterHomeDeepSleep(const HomeSleepRequest& request) {
+  const auto wakeupGpio = static_cast<gpio_num_t>(request.wakeupGpio);
   pinMode(static_cast<std::uint8_t>(request.wakeupGpio), INPUT_PULLUP);
-  esp_sleep_enable_timer_wakeup(request.timerWakeupUs);
-  esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(request.wakeupGpio), request.wakeOnLow ? 0 : 1);
+  if (esp_sleep_enable_timer_wakeup(request.timerWakeupUs) != ESP_OK) {
+    return;
+  }
+  if (rtc_gpio_pullup_en(wakeupGpio) != ESP_OK) {
+    return;
+  }
+  if (rtc_gpio_pulldown_dis(wakeupGpio) != ESP_OK) {
+    return;
+  }
+  if (rtc_gpio_set_direction_in_sleep(wakeupGpio, RTC_GPIO_MODE_INPUT_ONLY) != ESP_OK) {
+    return;
+  }
+  if (esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON) != ESP_OK) {
+    return;
+  }
+  if (esp_sleep_enable_ext0_wakeup(wakeupGpio, request.wakeOnLow ? 0 : 1) != ESP_OK) {
+    return;
+  }
   M5.Display.sleep();
   M5.Display.waitDisplay();
   esp_deep_sleep_start();
 }
+
+namespace {
 
 BootControllerDeps makeBootDeps() {
   BootControllerDeps deps{};

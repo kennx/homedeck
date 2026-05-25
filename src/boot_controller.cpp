@@ -78,7 +78,6 @@ void BootController::enterSystemMode() {
   setupButtonsPressedSinceMs_ = 0;
   setupButtonsWerePressed_ = false;
   setupShortcutConsumed_ = false;
-  systemModeStartedAtMs_ = deps_.millis ? deps_.millis() : 0;
   homeSleepRequested_ = false;
 
   if (deps_.restoreSystemTimeFromRtc) {
@@ -87,6 +86,7 @@ void BootController::enterSystemMode() {
   if (deps_.renderHome) {
     deps_.renderHome();
   }
+  systemModeStartedAtMs_ = deps_.millis ? deps_.millis() : 0;
 }
 
 void BootController::updateHomeSleep(unsigned long now) {

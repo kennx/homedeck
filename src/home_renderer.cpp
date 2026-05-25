@@ -47,7 +47,7 @@ constexpr int kTableRow1TextY = 303;
 constexpr int kTableRow2TextY = 350;
 constexpr int kTableYiTextY = 397;
 constexpr int kTableLineHeight = 27;
-constexpr int kEnvironmentTextTopY = 574;
+constexpr int kEnvironmentTextBottomInset = 12;
 constexpr int kEnvironmentTextLeftX = 12;
 constexpr int kEnvironmentTextRightX = 388;
 constexpr int kTableRowPaddingY = 10;
@@ -152,13 +152,14 @@ std::string formatHumidityText(const HomeCalendarData& data) {
 }
 
 void drawEnvironmentReadings(M5Canvas& canvas, const HomeCalendarData& data) {
-  canvas.setTextDatum(textdatum_t::top_left);
+  const int bottomY = canvas.height() - kEnvironmentTextBottomInset;
+  canvas.setTextDatum(textdatum_t::bottom_left);
   const std::string temperature = formatTemperatureText(data);
-  canvas.drawString(temperature.c_str(), kEnvironmentTextLeftX, kEnvironmentTextTopY);
+  canvas.drawString(temperature.c_str(), kEnvironmentTextLeftX, bottomY);
 
-  canvas.setTextDatum(textdatum_t::top_right);
+  canvas.setTextDatum(textdatum_t::bottom_right);
   const std::string humidity = formatHumidityText(data);
-  canvas.drawString(humidity.c_str(), kEnvironmentTextRightX, kEnvironmentTextTopY);
+  canvas.drawString(humidity.c_str(), kEnvironmentTextRightX, bottomY);
 }
 
 std::size_t utf8CodePointLength(unsigned char leadByte) {

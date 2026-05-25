@@ -183,6 +183,7 @@ struct FakePrintedText {
   std::string text;
   std::uint32_t color = TFT_BLACK;
   std::uint32_t background = TFT_WHITE;
+  int datum = 0;
 };
 
 struct FakeRect {
@@ -218,9 +219,12 @@ enum class textdatum_t {
   top_left = 0,
   top_center = 1,
   top_right = 2,
-  middle_left = 3,
-  middle_center = 4,
-  middle_right = 5,
+  middle_left = 4,
+  middle_center = 5,
+  middle_right = 6,
+  bottom_left = 8,
+  bottom_center = 9,
+  bottom_right = 10,
 };
 
 struct FakeDisplay {
@@ -457,7 +461,8 @@ struct FakeDisplay {
   void drawString(const char* text, int x, int y) {
     cursorX = x;
     cursorY = y;
-    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
+    prints.push_back(
+        {x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground, static_cast<int>(textDatum)});
   }
 
   void setEpdMode(int) {
@@ -573,7 +578,8 @@ struct FakeCanvas {
   }
 
   void print(const char* text) {
-    prints.push_back({cursorX, cursorY, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
+    prints.push_back(
+        {cursorX, cursorY, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground, static_cast<int>(textDatum)});
     cursorX += textWidth(text);
   }
 
@@ -632,7 +638,8 @@ struct FakeCanvas {
   void drawString(const char* text, int x, int y) {
     cursorX = x;
     cursorY = y;
-    prints.push_back({x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground});
+    prints.push_back(
+        {x, y, textSize, fontKind, text != nullptr ? text : "", textColor, textBackground, static_cast<int>(textDatum)});
   }
 
   void pushSprite(int x, int y) {

@@ -20,6 +20,7 @@ struct Fixture {
   bool restarted = false;
   bool buttonsPressed = false;
   unsigned long now = 0;
+  unsigned long renderHomeDurationMs = 0;
   int updateCalls = 0;
   std::time_t currentUnix = 1704110400;
   std::vector<homedeck::HomeSleepRequest> sleepRequests;
@@ -45,7 +46,10 @@ struct Fixture {
     deps.startConfigPortal = [this]() { portalStarted = true; };
     deps.handleConfigPortalClient = [this]() { portalHandled = true; };
     deps.restoreSystemTimeFromRtc = []() {};
-    deps.renderHome = [this]() { homeRendered = true; };
+    deps.renderHome = [this]() {
+      homeRendered = true;
+      now += renderHomeDurationMs;
+    };
     deps.updateButtons = [this]() { ++updateCalls; };
     deps.areSetupButtonsPressed = [this]() { return buttonsPressed; };
     deps.millis = [this]() { return now; };
@@ -203,6 +207,22 @@ void test_system_mode_sleeps_to_next_midnight_after_home_display_window() {
   TEST_ASSERT_TRUE(f.sleepRequests[0].wakeOnLow);
 }
 
+void test_system_mode_sleep_window_starts_after_home_render_completes() {
+  Fixture f{};
+  f.configured = true;
+  f.renderHomeDurationMs = 5000;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 64999;
+  controller.update();
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.sleepRequests.size()));
+
+  f.now = 65000;
+  controller.update();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+}
+
 void test_system_mode_uses_one_hour_sleep_when_time_is_not_trusted() {
   Fixture f{};
   f.configured = true;
@@ -281,6 +301,7 @@ int main(int, char**) {
   RUN_TEST(test_ab_does_not_restart_when_force_config_flag_write_fails);
   RUN_TEST(test_system_mode_does_not_sleep_before_home_display_window);
   RUN_TEST(test_system_mode_sleeps_to_next_midnight_after_home_display_window);
+  RUN_TEST(test_system_mode_sleep_window_starts_after_home_render_completes);
   RUN_TEST(test_system_mode_uses_one_hour_sleep_when_time_is_not_trusted);
   RUN_TEST(test_system_mode_requests_sleep_only_once);
   RUN_TEST(test_config_mode_does_not_request_home_sleep);

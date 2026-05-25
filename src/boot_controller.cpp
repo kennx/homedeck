@@ -1,11 +1,18 @@
 #include "boot_controller.h"
 
+#include <cstdint>
+#include <ctime>
 #include <utility>
 
 namespace homedeck {
 namespace {
 
 constexpr unsigned long kSetupShortcutHoldMs = 5000;
+constexpr unsigned long kHomeDisplayDurationMs = 60000;
+constexpr std::time_t kTrustedUnixTimeThreshold = 1704067200;
+constexpr std::uint64_t kMicrosPerSecond = 1000000ULL;
+constexpr std::uint64_t kFallbackSleepSeconds = 3600ULL;
+constexpr int kButtonCWakeupGpio = 1;
 
 }  // namespace
 
@@ -49,6 +56,10 @@ void BootController::update() {
   }
   const unsigned long now = deps_.millis ? deps_.millis() : 0;
   updateSetupShortcut(now);
+  if (setupShortcutConsumed_) {
+    return;
+  }
+  updateHomeSleep(now);
 }
 
 BootMode BootController::mode() const {
@@ -67,6 +78,8 @@ void BootController::enterSystemMode() {
   setupButtonsPressedSinceMs_ = 0;
   setupButtonsWerePressed_ = false;
   setupShortcutConsumed_ = false;
+  systemModeStartedAtMs_ = deps_.millis ? deps_.millis() : 0;
+  homeSleepRequested_ = false;
 
   if (deps_.restoreSystemTimeFromRtc) {
     deps_.restoreSystemTimeFromRtc();
@@ -74,6 +87,53 @@ void BootController::enterSystemMode() {
   if (deps_.renderHome) {
     deps_.renderHome();
   }
+}
+
+void BootController::updateHomeSleep(unsigned long now) {
+  if (homeSleepRequested_) {
+    return;
+  }
+  if (now - systemModeStartedAtMs_ < kHomeDisplayDurationMs) {
+    return;
+  }
+
+  homeSleepRequested_ = true;
+  if (deps_.enterDeepSleep) {
+    deps_.enterDeepSleep(makeHomeSleepRequest());
+  }
+}
+
+HomeSleepRequest BootController::makeHomeSleepRequest() const {
+  HomeSleepRequest request{};
+  request.wakeupGpio = kButtonCWakeupGpio;
+  request.wakeOnLow = true;
+  request.timerWakeupUs = kFallbackSleepSeconds * kMicrosPerSecond;
+
+  const std::time_t now = deps_.currentTime ? deps_.currentTime() : 0;
+  if (now < kTrustedUnixTimeThreshold) {
+    return request;
+  }
+
+  const std::tm* local = std::localtime(&now);
+  if (local == nullptr || local->tm_year < 124 || local->tm_mon < 0 || local->tm_mon > 11 || local->tm_mday < 1) {
+    return request;
+  }
+
+  std::tm nextMidnight = *local;
+  nextMidnight.tm_hour = 0;
+  nextMidnight.tm_min = 0;
+  nextMidnight.tm_sec = 0;
+  nextMidnight.tm_mday += 1;
+  nextMidnight.tm_isdst = -1;
+
+  const std::time_t wakeAt = std::mktime(&nextMidnight);
+  if (wakeAt <= now) {
+    return request;
+  }
+
+  const auto seconds = static_cast<std::uint64_t>(wakeAt - now);
+  request.timerWakeupUs = seconds * kMicrosPerSecond;
+  return request;
 }
 
 void BootController::updateSetupShortcut(unsigned long now) {

@@ -1,5 +1,9 @@
 #include <unity.h>
 
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+
 #include "boot_controller.h"
 
 namespace {
@@ -17,6 +21,8 @@ struct Fixture {
   bool buttonsPressed = false;
   unsigned long now = 0;
   int updateCalls = 0;
+  std::time_t currentUnix = 1704110400;
+  std::vector<homedeck::HomeSleepRequest> sleepRequests;
 
   homedeck::BootControllerDeps deps() {
     homedeck::BootControllerDeps deps{};
@@ -44,11 +50,23 @@ struct Fixture {
     deps.areSetupButtonsPressed = [this]() { return buttonsPressed; };
     deps.millis = [this]() { return now; };
     deps.restart = [this]() { restarted = true; };
+    deps.currentTime = [this]() { return currentUnix; };
+    deps.enterDeepSleep = [this](const homedeck::HomeSleepRequest& request) {
+      sleepRequests.push_back(request);
+    };
     return deps;
   }
 };
 
 }  // namespace
+
+void setUp() {
+  setenv("TZ", "UTC", 1);
+  tzset();
+}
+
+void tearDown() {
+}
 
 void test_first_boot_enters_config_mode() {
   Fixture f{};
@@ -157,6 +175,91 @@ void test_ab_does_not_restart_when_force_config_flag_write_fails() {
   TEST_ASSERT_FALSE(f.restarted);
 }
 
+void test_system_mode_does_not_sleep_before_home_display_window() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 59999;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.sleepRequests.size()));
+}
+
+void test_system_mode_sleeps_to_next_midnight_after_home_display_window() {
+  Fixture f{};
+  f.configured = true;
+  f.currentUnix = 1704110400;  // 2024-01-01 12:00:00 UTC
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 60000;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+  TEST_ASSERT_EQUAL_UINT64(43200000000ULL, f.sleepRequests[0].timerWakeupUs);
+  TEST_ASSERT_EQUAL(1, f.sleepRequests[0].wakeupGpio);
+  TEST_ASSERT_TRUE(f.sleepRequests[0].wakeOnLow);
+}
+
+void test_system_mode_uses_one_hour_sleep_when_time_is_not_trusted() {
+  Fixture f{};
+  f.configured = true;
+  f.currentUnix = 1000;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 60000;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+  TEST_ASSERT_EQUAL_UINT64(3600000000ULL, f.sleepRequests[0].timerWakeupUs);
+}
+
+void test_system_mode_requests_sleep_only_once() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 60000;
+  controller.update();
+  f.now = 70000;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+}
+
+void test_config_mode_does_not_request_home_sleep() {
+  Fixture f{};
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 60000;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.sleepRequests.size()));
+  TEST_ASSERT_TRUE(f.portalHandled);
+}
+
+void test_ab_config_reboot_takes_priority_over_sleep() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.buttonsPressed = true;
+  f.now = 55000;
+  controller.update();
+  f.now = 60000;
+  controller.update();
+
+  TEST_ASSERT_TRUE(f.forceFlagWritten);
+  TEST_ASSERT_TRUE(f.restarted);
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.sleepRequests.size()));
+}
+
 void test_config_mode_update_handles_portal_client() {
   Fixture f{};
   homedeck::BootController controller{f.deps()};
@@ -176,6 +279,12 @@ int main(int, char**) {
   RUN_TEST(test_ab_release_resets_hold_timer);
   RUN_TEST(test_ab_held_after_startup_window_requests_config_reboot);
   RUN_TEST(test_ab_does_not_restart_when_force_config_flag_write_fails);
+  RUN_TEST(test_system_mode_does_not_sleep_before_home_display_window);
+  RUN_TEST(test_system_mode_sleeps_to_next_midnight_after_home_display_window);
+  RUN_TEST(test_system_mode_uses_one_hour_sleep_when_time_is_not_trusted);
+  RUN_TEST(test_system_mode_requests_sleep_only_once);
+  RUN_TEST(test_config_mode_does_not_request_home_sleep);
+  RUN_TEST(test_ab_config_reboot_takes_priority_over_sleep);
   RUN_TEST(test_config_mode_update_handles_portal_client);
   return UNITY_END();
 }

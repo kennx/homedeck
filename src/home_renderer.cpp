@@ -12,6 +12,7 @@
 
 #include "almanac_provider.h"
 #include "generated/device_font_vlw.h"
+#include "sht40_reader.h"
 
 namespace homedeck {
 namespace {
@@ -395,6 +396,33 @@ HomeCalendarData makeCurrentHomeCalendarData() {
   return makeHomeCalendarData(local != nullptr ? *local : fallbackLocalTime());
 }
 
+CalendarData makeCalendarData(const std::tm& localTime) {
+  CalendarData data{};
+  data.year = localTime.tm_year + 1900;
+  data.month = localTime.tm_mon + 1;
+  data.day = localTime.tm_mday;
+  data.todayWeekday = localTime.tm_wday;
+  return data;
+}
+
+CalendarData makeCurrentCalendarData() {
+  const std::time_t now = std::time(nullptr);
+  const std::tm* local = now > 0 ? std::localtime(&now) : nullptr;
+  if (local == nullptr) {
+    std::tm fallback = fallbackLocalTime();
+    return makeCalendarData(fallback);
+  }
+  CalendarData data = makeCalendarData(*local);
+  const EnvironmentReading reading = readSht40Environment();
+  if (reading.ok) {
+    data.temperatureAvailable = true;
+    data.temperatureCelsius = reading.temperatureCelsius;
+    data.humidityAvailable = true;
+    data.humidityPercent = reading.humidityPercent;
+  }
+  return data;
+}
+
 void HomeRenderer::render() {
   render(makeCurrentHomeCalendarData());
 }
@@ -494,6 +522,149 @@ void HomeRenderer::renderConfigPortal(const std::string& apSsid, const std::stri
 
   const std::string qrText = std::string("WIFI:T:nopass;S:") + apSsid + ";;";
   drawQrCode(canvas, qrText, kQrLeftX, kQrTopY, kQrSize);
+  pushScreen(canvas);
+}
+
+namespace {
+
+constexpr int kCalInsetX = 12;
+constexpr int kCalRightX = 388;
+constexpr int kCalWidth = 376;
+constexpr int kCalCenterX = 200;
+constexpr int kCalHeaderTopY = 12;
+constexpr int kCalHeaderHeight = 27;
+constexpr int kCalWeekdayTopY = 51;
+constexpr int kCalWeekdayHeight = 47;
+constexpr int kCalDateStartY = 108;
+constexpr int kCalDateRowHeight = 47;
+constexpr int kCalDateRowGap = 10;
+constexpr int kCalColCount = 7;
+constexpr int kCalDateRows = 6;
+
+const char* calendarWeekdayLabel(int index) {
+  static constexpr const char* kLabels[] = {"日", "一", "二", "三", "四", "五", "六"};
+  if (index < 0 || index >= 7) return "";
+  return kLabels[index];
+}
+
+std::string formatCalendarYear(int year) {
+  char buffer[16] = {};
+  std::snprintf(buffer, sizeof(buffer), "%d 年", year);
+  return buffer;
+}
+
+std::string formatCalendarMonth(int month) {
+  static constexpr const char* kNames[] = {
+      "一月", "二月", "三月", "四月", "五月", "六月",
+      "七月", "八月", "九月", "十月", "十一月", "十二月"};
+  if (month < 1 || month > 12) return "";
+  return kNames[month - 1];
+}
+
+std::string formatCalendarWeekday(int wday) {
+  static constexpr const char* kNames[] = {
+      "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
+  if (wday < 0 || wday >= 7) return "";
+  return kNames[wday];
+}
+
+int daysInMonth(int year, int month) {
+  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month < 1 || month > 12) return 31;
+  if (month == 2) {
+    const bool isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    return isLeap ? 29 : 28;
+  }
+  return kDays[month - 1];
+}
+
+int cellLeftX(int col) {
+  return kCalInsetX + col * kCalWidth / kCalColCount;
+}
+
+int cellRightX(int col) {
+  return kCalInsetX + (col + 1) * kCalWidth / kCalColCount;
+}
+
+int cellCenterX(int col) {
+  return (cellLeftX(col) + cellRightX(col)) / 2;
+}
+
+}  // namespace
+
+void HomeRenderer::renderCalendar(const CalendarData& data) {
+  M5Canvas canvas(&M5.Display);
+  prepareScreen(canvas);
+
+  if (canvas.loadFont(generated::kDeviceFontVlw)) {
+    // 标题行：年 | 月 | 星期
+    canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+    canvas.setTextDatum(textdatum_t::top_left);
+    canvas.drawString(formatCalendarYear(data.year).c_str(), kCalInsetX, kCalHeaderTopY);
+
+    canvas.setTextDatum(textdatum_t::top_center);
+    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalCenterX, kCalHeaderTopY);
+
+    canvas.setTextDatum(textdatum_t::top_right);
+    canvas.drawString(formatCalendarWeekday(data.todayWeekday).c_str(), kCalRightX, kCalHeaderTopY);
+
+    // 星期行
+    canvas.setTextDatum(textdatum_t::middle_center);
+    for (int col = 0; col < kCalColCount; ++col) {
+      const int cx = cellCenterX(col);
+      const int cy = kCalWeekdayTopY + kCalWeekdayHeight / 2;
+      canvas.drawString(calendarWeekdayLabel(col), cx, cy);
+    }
+    canvas.unloadFont();
+  }
+
+  // 日期网格
+  std::tm firstDayTm{};
+  firstDayTm.tm_year = data.year - 1900;
+  firstDayTm.tm_mon = data.month - 1;
+  firstDayTm.tm_mday = 1;
+  std::mktime(&firstDayTm);
+  const int firstWeekday = firstDayTm.tm_wday;
+  const int monthDays = daysInMonth(data.year, data.month);
+
+  if (canvas.loadFont(generated::kDeviceFontVlw)) {
+    for (int row = 0; row < kCalDateRows; ++row) {
+      for (int col = 0; col < kCalColCount; ++col) {
+        const int cellIndex = row * kCalColCount + col;
+        const int dayNumber = cellIndex - firstWeekday + 1;
+
+        if (dayNumber < 1 || dayNumber > monthDays) {
+          continue;
+        }
+
+        const int cx = cellCenterX(col);
+        const int cy = kCalDateStartY + row * (kCalDateRowHeight + kCalDateRowGap) + kCalDateRowHeight / 2;
+
+        if (dayNumber == data.day) {
+          // 当天高亮：黑底白字
+          const int left = cellLeftX(col);
+          const int right = cellRightX(col);
+          canvas.fillRect(left, cy - kCalDateRowHeight / 2, right - left, kCalDateRowHeight, TFT_BLACK);
+          canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+        } else {
+          canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+        }
+
+        canvas.setTextDatum(textdatum_t::middle_center);
+        canvas.drawString(std::to_string(dayNumber).c_str(), cx, cy);
+      }
+    }
+    canvas.unloadFont();
+  }
+
+  // 底部温湿度
+  HomeCalendarData envData{};
+  envData.temperatureAvailable = data.temperatureAvailable;
+  envData.temperatureCelsius = data.temperatureCelsius;
+  envData.humidityAvailable = data.humidityAvailable;
+  envData.humidityPercent = data.humidityPercent;
+  drawEnvironmentReadings(canvas, envData);
+
   pushScreen(canvas);
 }
 

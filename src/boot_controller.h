@@ -56,7 +56,6 @@ class BootController {
   void enterConfigMode();
   void enterSystemMode();
   void updateSetupShortcut(unsigned long now);
-  void updateViewSwitch(unsigned long now);
   void updateHomeSleep(unsigned long now);
   HomeSleepRequest makeHomeSleepRequest() const;
 

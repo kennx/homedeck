@@ -57,6 +57,7 @@ struct FakeRtc {
   bool setSystemTimeFromRtcCalled = false;
   bool setDateTimeCalled = false;
   bool corruptTimezoneOnRestore = false;
+  int readBackSecondsOffset = 0;
   bool voltLow = false;
   m5::rtc_datetime_t dateTime{};
   std::tm lastSetTm{};
@@ -70,6 +71,39 @@ struct FakeRtc {
       return false;
     }
     *out = dateTime;
+    if (readBackSecondsOffset != 0) {
+      std::tm shifted{};
+      shifted.tm_year = dateTime.date.year - 1900;
+      shifted.tm_mon = dateTime.date.month - 1;
+      shifted.tm_mday = dateTime.date.date;
+      shifted.tm_hour = dateTime.time.hours;
+      shifted.tm_min = dateTime.time.minutes;
+      shifted.tm_sec = dateTime.time.seconds + readBackSecondsOffset;
+      shifted.tm_isdst = 0;
+
+      char* oldTimezone = std::getenv("TZ");
+      const std::string savedTimezone = oldTimezone != nullptr ? oldTimezone : "";
+      setenv("TZ", "UTC0", 1);
+      tzset();
+      const std::time_t shiftedUnix = std::mktime(&shifted);
+      const std::tm* normalized = std::gmtime(&shiftedUnix);
+      if (oldTimezone != nullptr) {
+        setenv("TZ", savedTimezone.c_str(), 1);
+      } else {
+        unsetenv("TZ");
+      }
+      tzset();
+
+      if (normalized != nullptr) {
+        out->date.year = static_cast<std::int16_t>(normalized->tm_year + 1900);
+        out->date.month = static_cast<std::int8_t>(normalized->tm_mon + 1);
+        out->date.date = static_cast<std::int8_t>(normalized->tm_mday);
+        out->date.weekDay = static_cast<std::int8_t>(normalized->tm_wday);
+        out->time.hours = static_cast<std::int8_t>(normalized->tm_hour);
+        out->time.minutes = static_cast<std::int8_t>(normalized->tm_min);
+        out->time.seconds = static_cast<std::int8_t>(normalized->tm_sec);
+      }
+    }
     return true;
   }
 

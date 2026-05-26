@@ -15,6 +15,7 @@ bool syncNtpForTest(
     const std::string& posixTimezone,
     const std::string& ntpServer,
     time_t* syncedUnix);
+bool writeRtcUtcForTest(time_t unixTime);
 #endif
 
 }  // namespace homedeck

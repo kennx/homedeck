@@ -94,6 +94,21 @@ void test_enter_home_deep_sleep_configures_timer_button_c_gpio_and_display_sleep
   TEST_ASSERT_TRUE(gDeepSleepCalled);
 }
 
+void test_enter_home_deep_sleep_does_not_touch_i2c() {
+  M5.In_I2C.enabled = true;
+  loadEnvironmentFrame(28086, 29360);
+  homedeck::HomeSleepRequest request{};
+  request.timerWakeupUs = 43200000000ULL;
+  request.wakeupGpio = 1;
+  request.wakeOnLow = true;
+
+  homedeck::enterHomeDeepSleep(request);
+
+  TEST_ASSERT_EQUAL(0, M5.In_I2C.startCalls);
+  TEST_ASSERT_EQUAL(0, M5.In_I2C.stopCalls);
+  TEST_ASSERT_EQUAL(0, static_cast<int>(M5.In_I2C.writtenBytes.size()));
+}
+
 void test_app_setup_reapplies_timezone_after_rtc_restore() {
   setenv("TZ", "UTC", 1);
   tzset();
@@ -131,6 +146,17 @@ void test_sync_ntp_returns_time_after_sntp_completion() {
   TEST_ASSERT_TRUE(ok);
   TEST_ASSERT_GREATER_OR_EQUAL(250, static_cast<int>(millis()));
   TEST_ASSERT_GREATER_OR_EQUAL_INT64(1704067200, syncedUnix);
+}
+
+void test_write_rtc_utc_accepts_one_second_readback_drift() {
+  M5.Rtc.enabled = true;
+  M5.Rtc.getDateTimeOk = true;
+  M5.Rtc.readBackSecondsOffset = -1;
+
+  const bool ok = homedeck::writeRtcUtcForTest(1779573600);
+
+  TEST_ASSERT_TRUE(ok);
+  TEST_ASSERT_TRUE(M5.Rtc.setDateTimeCalled);
 }
 
 void test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails() {
@@ -258,9 +284,11 @@ void test_enter_home_deep_sleep_does_not_sleep_when_ext0_wakeup_fails() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_enter_home_deep_sleep_configures_timer_button_c_gpio_and_display_sleep);
+  RUN_TEST(test_enter_home_deep_sleep_does_not_touch_i2c);
   RUN_TEST(test_app_setup_reapplies_timezone_after_rtc_restore);
   RUN_TEST(test_sync_ntp_waits_for_sntp_completion_even_when_clock_is_already_modern);
   RUN_TEST(test_sync_ntp_returns_time_after_sntp_completion);
+  RUN_TEST(test_write_rtc_utc_accepts_one_second_readback_drift);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_rtc_gpio_setup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_rtc_gpio_pulldown_disable_fails);

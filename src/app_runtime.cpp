@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -124,12 +125,26 @@ bool writeRtcUtc(time_t unixTime) {
   // 验证写入：立即读取 RTC 并比对，防止 I2C 静默失败
   m5::rtc_datetime_t dt;
   if (M5.Rtc.getDateTime(&dt)) {
-    if (dt.date.year == utc->tm_year + 1900 &&
-        dt.date.month == utc->tm_mon + 1 &&
-        dt.date.date == utc->tm_mday &&
-        dt.time.hours == utc->tm_hour &&
-        dt.time.minutes == utc->tm_min &&
-        dt.time.seconds == utc->tm_sec) {
+    std::tm readBack{};
+    readBack.tm_year = dt.date.year - 1900;
+    readBack.tm_mon = dt.date.month - 1;
+    readBack.tm_mday = dt.date.date;
+    readBack.tm_hour = dt.time.hours;
+    readBack.tm_min = dt.time.minutes;
+    readBack.tm_sec = dt.time.seconds;
+    readBack.tm_isdst = 0;
+    const char* previousTimezone = std::getenv("TZ");
+    const std::string savedTimezone = previousTimezone != nullptr ? previousTimezone : "";
+    setenv("TZ", "UTC0", 1);
+    tzset();
+    const time_t readBackUnix = std::mktime(&readBack);
+    if (previousTimezone != nullptr) {
+      setenv("TZ", savedTimezone.c_str(), 1);
+    } else {
+      unsetenv("TZ");
+    }
+    tzset();
+    if (readBackUnix >= 0 && std::llabs(static_cast<long long>(readBackUnix) - static_cast<long long>(unixTime)) <= 1) {
       return true;
     }
   }
@@ -180,7 +195,9 @@ void renderHomeWithEnvironment() {
 }
 
 void renderHomeWithDeepSleepMessage() {
-  gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment("DEEP SLEEP"));
+  HomeCalendarData data = makeCurrentHomeCalendarData();
+  data.bottomCenterMessage = "DEEP SLEEP";
+  gHomeRenderer.render(data);
 }
 
 }  // namespace
@@ -191,6 +208,10 @@ bool syncNtpForTest(
     const std::string& ntpServer,
     time_t* syncedUnix) {
   return syncNtp(posixTimezone, ntpServer, syncedUnix);
+}
+
+bool writeRtcUtcForTest(time_t unixTime) {
+  return writeRtcUtc(unixTime);
 }
 #endif
 

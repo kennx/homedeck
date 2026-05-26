@@ -61,7 +61,10 @@ void BootController::update() {
   }
 
   if (viewManager_) {
-    viewManager_->update();
+    viewManager_->resetViewSwitched();
+    if (deps_.wasCalendarButtonClicked && deps_.wasCalendarButtonClicked()) {
+      viewManager_->switchToNextView();
+    }
     if (viewManager_->viewSwitched()) {
       lastActivityMs_ = now;
     }
@@ -99,7 +102,6 @@ void BootController::enterSystemMode() {
   ViewManagerDeps vmDeps{};
   vmDeps.renderAlmanac = deps_.renderAlmanac;
   vmDeps.renderCalendar = deps_.renderCalendar;
-  vmDeps.wasCalendarButtonClicked = deps_.wasCalendarButtonClicked;
   viewManager_ = std::make_unique<ViewManager>(std::move(vmDeps));
   viewManager_->begin();
 

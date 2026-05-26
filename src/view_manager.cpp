@@ -9,12 +9,7 @@ void ViewManager::begin() {
   switchTo(SystemView::Almanac);
 }
 
-void ViewManager::update() {
-  viewSwitched_ = false;
-  if (!deps_.wasCalendarButtonClicked || !deps_.wasCalendarButtonClicked()) {
-    return;
-  }
-
+void ViewManager::switchToNextView() {
   switch (currentView_) {
     case SystemView::Almanac:
       switchTo(SystemView::Calendar);
@@ -31,6 +26,10 @@ SystemView ViewManager::currentView() const {
 
 bool ViewManager::viewSwitched() const {
   return viewSwitched_;
+}
+
+void ViewManager::resetViewSwitched() {
+  viewSwitched_ = false;
 }
 
 void ViewManager::switchTo(SystemView view) {

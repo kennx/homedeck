@@ -8,13 +8,11 @@ namespace {
 
 struct Fixture {
   std::vector<std::string> renderedViews;
-  bool buttonClicked = false;
 
   homedeck::ViewManagerDeps deps() {
     homedeck::ViewManagerDeps deps{};
     deps.renderAlmanac = [this]() { renderedViews.push_back("almanac"); };
     deps.renderCalendar = [this]() { renderedViews.push_back("calendar"); };
-    deps.wasCalendarButtonClicked = [this]() { return buttonClicked; };
     return deps;
   }
 };
@@ -39,14 +37,13 @@ void test_view_manager_begins_with_almanac() {
   TEST_ASSERT_EQUAL_STRING("almanac", f.renderedViews[0].c_str());
 }
 
-void test_view_manager_switches_to_calendar_on_button_click() {
+void test_view_manager_switch_to_next_view_from_almanac() {
   Fixture f{};
   homedeck::ViewManager vm{f.deps()};
   vm.begin();
   f.renderedViews.clear();
 
-  f.buttonClicked = true;
-  vm.update();
+  vm.switchToNextView();
 
   TEST_ASSERT_EQUAL(homedeck::SystemView::Calendar, vm.currentView());
   TEST_ASSERT_TRUE(vm.viewSwitched());
@@ -54,33 +51,40 @@ void test_view_manager_switches_to_calendar_on_button_click() {
   TEST_ASSERT_EQUAL_STRING("calendar", f.renderedViews[0].c_str());
 }
 
-void test_view_manager_switches_back_to_almanac_on_second_click() {
+void test_view_manager_switch_to_next_view_from_calendar() {
   Fixture f{};
   homedeck::ViewManager vm{f.deps()};
   vm.begin();
+  vm.switchToNextView();
   f.renderedViews.clear();
 
-  f.buttonClicked = true;
-  vm.update();
-  f.buttonClicked = false;
-  vm.update();
-
-  f.buttonClicked = true;
-  vm.update();
+  vm.switchToNextView();
 
   TEST_ASSERT_EQUAL(homedeck::SystemView::Almanac, vm.currentView());
   TEST_ASSERT_TRUE(vm.viewSwitched());
-  TEST_ASSERT_EQUAL_STRING("almanac", f.renderedViews.back().c_str());
+  TEST_ASSERT_EQUAL_STRING("almanac", f.renderedViews[0].c_str());
 }
 
-void test_view_manager_does_not_switch_when_button_not_clicked() {
+void test_view_manager_switch_to_next_view_cycles() {
   Fixture f{};
   homedeck::ViewManager vm{f.deps()};
   vm.begin();
+
+  vm.switchToNextView();
+  vm.switchToNextView();
+  vm.switchToNextView();
+
+  TEST_ASSERT_EQUAL(homedeck::SystemView::Calendar, vm.currentView());
+}
+
+void test_view_manager_does_not_switch_without_call() {
+  Fixture f{};
+  homedeck::ViewManager vm{f.deps()};
+  vm.begin();
+  vm.resetViewSwitched();
   f.renderedViews.clear();
 
-  f.buttonClicked = false;
-  vm.update();
+  // 不调用 switchToNextView
 
   TEST_ASSERT_EQUAL(homedeck::SystemView::Almanac, vm.currentView());
   TEST_ASSERT_FALSE(vm.viewSwitched());
@@ -90,8 +94,9 @@ void test_view_manager_does_not_switch_when_button_not_clicked() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_view_manager_begins_with_almanac);
-  RUN_TEST(test_view_manager_switches_to_calendar_on_button_click);
-  RUN_TEST(test_view_manager_switches_back_to_almanac_on_second_click);
-  RUN_TEST(test_view_manager_does_not_switch_when_button_not_clicked);
+  RUN_TEST(test_view_manager_switch_to_next_view_from_almanac);
+  RUN_TEST(test_view_manager_switch_to_next_view_from_calendar);
+  RUN_TEST(test_view_manager_switch_to_next_view_cycles);
+  RUN_TEST(test_view_manager_does_not_switch_without_call);
   return UNITY_END();
 }

@@ -12,16 +12,16 @@ enum class SystemView {
 struct ViewManagerDeps {
   std::function<void()> renderAlmanac;
   std::function<void()> renderCalendar;
-  std::function<bool()> wasCalendarButtonClicked;
 };
 
 class ViewManager {
  public:
   explicit ViewManager(ViewManagerDeps deps);
   void begin();
-  void update();
+  void switchToNextView();
   SystemView currentView() const;
   bool viewSwitched() const;
+  void resetViewSwitched();
 
  private:
   void switchTo(SystemView view);

@@ -731,8 +731,16 @@ using M5Canvas = FakeCanvas;
 
 struct FakeButton {
   bool pressed = false;
+  bool clicked = false;
   bool isPressed() const {
     return pressed;
+  }
+  bool wasClicked() {
+    if (clicked) {
+      clicked = false;
+      return true;
+    }
+    return false;
   }
 };
 

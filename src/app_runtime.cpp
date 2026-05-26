@@ -194,6 +194,10 @@ void renderHomeWithEnvironment() {
   gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment());
 }
 
+void renderCalendarWithEnvironment() {
+  gHomeRenderer.renderCalendar(makeCurrentCalendarData());
+}
+
 void renderHomeWithDeepSleepMessage() {
   HomeCalendarData data = makeCurrentHomeCalendarData();
   data.bottomCenterMessage = "DEEP SLEEP";
@@ -268,7 +272,7 @@ BootControllerDeps makeBootDeps() {
     }
   };
   deps.renderAlmanac = renderHomeWithEnvironment;
-  deps.renderCalendar = []() {};  // TODO: implement calendar rendering
+  deps.renderCalendar = renderCalendarWithEnvironment;
   deps.wasCalendarButtonClicked = []() { return M5.BtnC.wasClicked(); };
   deps.updateButtons = []() { M5.update(); };
   deps.areSetupButtonsPressed = []() { return M5.BtnA.isPressed() && M5.BtnB.isPressed(); };

@@ -5,6 +5,7 @@
 #include <M5Unified.h>
 #include <WiFi.h>
 #include <driver/rtc_io.h>
+#include <esp_sntp.h>
 #include <esp_sleep.h>
 #include <time.h>
 
@@ -74,6 +75,10 @@ ConfigPortal gConfigPortal;
 std::unique_ptr<TimeService> gTimeService;
 std::unique_ptr<BootController> gBootController;
 
+constexpr time_t kTrustedUnixTimeThreshold = 1704067200;
+constexpr unsigned long kNtpSyncTimeoutMs = 10000;
+constexpr unsigned long kNtpPollIntervalMs = 250;
+
 std::string makeApSsid() {
   const std::uint64_t mac = ESP.getEfuseMac();
   char suffix[5] = {};
@@ -89,15 +94,18 @@ bool syncNtp(const std::string& posixTimezone, const std::string& ntpServer, tim
   if (syncedUnix == nullptr) {
     return false;
   }
+  sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   configTzTime(posixTimezone.c_str(), ntpServer.c_str());
   const unsigned long startedAt = millis();
-  while (millis() - startedAt < 10000) {
-    const time_t now = time(nullptr);
-    if (now >= 1704067200) {
-      *syncedUnix = now;
-      return true;
+  while (millis() - startedAt < kNtpSyncTimeoutMs) {
+    if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
+      const time_t now = time(nullptr);
+      if (now >= kTrustedUnixTimeThreshold) {
+        *syncedUnix = now;
+        return true;
+      }
     }
-    delay(250);
+    delay(kNtpPollIntervalMs);
   }
   return false;
 }
@@ -166,6 +174,15 @@ void renderHomeWithEnvironment() {
 }
 
 }  // namespace
+
+#ifdef UNIT_TEST
+bool syncNtpForTest(
+    const std::string& posixTimezone,
+    const std::string& ntpServer,
+    time_t* syncedUnix) {
+  return syncNtp(posixTimezone, ntpServer, syncedUnix);
+}
+#endif
 
 void enterHomeDeepSleep(const HomeSleepRequest& request) {
   const auto wakeupGpio = static_cast<gpio_num_t>(request.wakeupGpio);

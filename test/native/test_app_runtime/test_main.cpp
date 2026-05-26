@@ -4,6 +4,7 @@
 #include <M5Unified.h>
 #include <Preferences.h>
 #include <driver/rtc_io.h>
+#include <esp_sntp.h>
 #include <esp_sleep.h>
 
 #include <cstdlib>
@@ -14,6 +15,7 @@
 void setUp() {
   M5 = FakeM5Global{};
   fakeArduinoResetClock();
+  fakeSntpReset();
   fakePreferencesReset();
   fakeEspSleepReset();
   fakeEspSleepResetExt0();
@@ -61,6 +63,31 @@ void test_app_setup_reapplies_timezone_after_rtc_restore() {
 
   TEST_ASSERT_TRUE(M5.Rtc.setSystemTimeFromRtcCalled);
   TEST_ASSERT_EQUAL_STRING("CST-8", std::getenv("TZ"));
+}
+
+void test_sync_ntp_waits_for_sntp_completion_even_when_clock_is_already_modern() {
+  time_t syncedUnix = 0;
+
+  const bool ok = homedeck::syncNtpForTest("CST-8", "pool.ntp.org", &syncedUnix);
+
+  TEST_ASSERT_FALSE(ok);
+  TEST_ASSERT_EQUAL_INT64(0, syncedUnix);
+  TEST_ASSERT_EQUAL_STRING("CST-8", gFakeTimezone.c_str());
+  TEST_ASSERT_EQUAL_STRING("pool.ntp.org", gFakeNtpServer.c_str());
+}
+
+void test_sync_ntp_returns_time_after_sntp_completion() {
+  gFakeDelayCallback = [](unsigned long ms) {
+    fakeArduinoSetMillis(millis() + ms);
+    sntp_set_sync_status(SNTP_SYNC_STATUS_COMPLETED);
+  };
+  time_t syncedUnix = 0;
+
+  const bool ok = homedeck::syncNtpForTest("CST-8", "pool.ntp.org", &syncedUnix);
+
+  TEST_ASSERT_TRUE(ok);
+  TEST_ASSERT_GREATER_OR_EQUAL(250, static_cast<int>(millis()));
+  TEST_ASSERT_GREATER_OR_EQUAL_INT64(1704067200, syncedUnix);
 }
 
 void test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails() {
@@ -113,6 +140,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_enter_home_deep_sleep_configures_timer_button_c_gpio_and_display_sleep);
   RUN_TEST(test_app_setup_reapplies_timezone_after_rtc_restore);
+  RUN_TEST(test_sync_ntp_waits_for_sntp_completion_even_when_clock_is_already_modern);
+  RUN_TEST(test_sync_ntp_returns_time_after_sntp_completion);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_rtc_gpio_setup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_ext0_wakeup_fails);

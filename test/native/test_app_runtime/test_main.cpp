@@ -2,8 +2,11 @@
 
 #include <Arduino.h>
 #include <M5Unified.h>
+#include <Preferences.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
+
+#include <cstdlib>
 
 #include "app_runtime.h"
 #include "boot_controller.h"
@@ -11,6 +14,7 @@
 void setUp() {
   M5 = FakeM5Global{};
   fakeArduinoResetClock();
+  fakePreferencesReset();
   fakeEspSleepReset();
   fakeEspSleepResetExt0();
   fakeRtcIoReset();
@@ -43,6 +47,20 @@ void test_enter_home_deep_sleep_configures_timer_button_c_gpio_and_display_sleep
   TEST_ASSERT_EQUAL(1, M5.Display.sleepCount);
   TEST_ASSERT_EQUAL(1, M5.Display.waitDisplayCount);
   TEST_ASSERT_TRUE(gDeepSleepCalled);
+}
+
+void test_app_setup_reapplies_timezone_after_rtc_restore() {
+  setenv("TZ", "UTC", 1);
+  tzset();
+  gFakePreferenceBools["configured"] = true;
+  gFakePreferenceStrings["tz"] = "Asia/Shanghai";
+  M5.Rtc.enabled = true;
+  M5.Rtc.corruptTimezoneOnRestore = true;
+
+  homedeck::appSetup();
+
+  TEST_ASSERT_TRUE(M5.Rtc.setSystemTimeFromRtcCalled);
+  TEST_ASSERT_EQUAL_STRING("CST-8", std::getenv("TZ"));
 }
 
 void test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails() {
@@ -94,6 +112,7 @@ void test_enter_home_deep_sleep_does_not_sleep_when_ext0_wakeup_fails() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_enter_home_deep_sleep_configures_timer_button_c_gpio_and_display_sleep);
+  RUN_TEST(test_app_setup_reapplies_timezone_after_rtc_restore);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_timer_wakeup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_rtc_gpio_setup_fails);
   RUN_TEST(test_enter_home_deep_sleep_does_not_sleep_when_ext0_wakeup_fails);

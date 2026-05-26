@@ -147,14 +147,16 @@ void test_restore_uses_rtc_when_available_and_not_low_voltage() {
   TEST_ASSERT_TRUE(f.restoreCalled);
 }
 
-void test_restore_skips_low_voltage_rtc() {
+void test_restore_uses_rtc_even_when_low_voltage_reported() {
   Fixture f{};
   f.rtcVoltLow = true;
   homedeck::TimeService service{f.deps()};
 
   service.restoreSystemTimeFromRtc();
 
-  TEST_ASSERT_FALSE(f.restoreCalled);
+  // VLF 标志可能因未被清除而误报，且即使电池电压偏低，
+  // 恢复旧时间也比使用 build 时间/1970 年更好
+  TEST_ASSERT_TRUE(f.restoreCalled);
 }
 
 int main(int, char**) {
@@ -166,6 +168,6 @@ int main(int, char**) {
   RUN_TEST(test_manual_save_applies_selected_timezone);
   RUN_TEST(test_apply_timezone_updates_process_timezone);
   RUN_TEST(test_restore_uses_rtc_when_available_and_not_low_voltage);
-  RUN_TEST(test_restore_skips_low_voltage_rtc);
+  RUN_TEST(test_restore_uses_rtc_even_when_low_voltage_reported);
   return UNITY_END();
 }

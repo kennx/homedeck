@@ -82,9 +82,9 @@ void TimeService::restoreSystemTimeFromRtc() {
   if (deps_.rtcAvailable && !deps_.rtcAvailable()) {
     return;
   }
-  if (deps_.rtcVoltLow && deps_.rtcVoltLow()) {
-    return;
-  }
+  // 不再因 rtcVoltLow 而放弃恢复时间：
+  // 1. VLF 标志可能因未被清除而误报
+  // 2. 即使电池电压偏低，恢复旧时间也比使用 build 时间/1970 年更好
   if (deps_.restoreSystemTimeFromRtc) {
     deps_.restoreSystemTimeFromRtc();
   }

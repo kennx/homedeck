@@ -119,20 +119,15 @@ HomeSleepRequest BootController::makeHomeSleepRequest() const {
     return request;
   }
 
-  std::tm nextMidnight = *local;
-  nextMidnight.tm_hour = 0;
-  nextMidnight.tm_min = 0;
-  nextMidnight.tm_sec = 0;
-  nextMidnight.tm_mday += 1;
-  nextMidnight.tm_isdst = -1;
-
-  const std::time_t wakeAt = std::mktime(&nextMidnight);
-  if (wakeAt <= now) {
+  // 手动计算到次日 00:00:00 的秒数。
+  // 不依赖 std::mktime：ESP32 newlib 的 mktime 对 POSIX TZ 字符串支持不稳定，
+  // 且 M5Unified 的 setSystemTimeFromRtc() 可能破坏 TZ 环境变量。
+  const int secondsUntilMidnight = (24 - local->tm_hour) * 3600 - local->tm_min * 60 - local->tm_sec;
+  if (secondsUntilMidnight <= 0) {
     return request;
   }
 
-  const auto seconds = static_cast<std::uint64_t>(wakeAt - now);
-  request.timerWakeupUs = seconds * kMicrosPerSecond;
+  request.timerWakeupUs = static_cast<std::uint64_t>(secondsUntilMidnight) * kMicrosPerSecond;
   return request;
 }
 

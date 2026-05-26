@@ -207,6 +207,22 @@ void test_system_mode_sleeps_to_next_midnight_after_home_display_window() {
   TEST_ASSERT_TRUE(f.sleepRequests[0].wakeOnLow);
 }
 
+void test_system_mode_sleeps_to_local_midnight_after_manual_shanghai_time() {
+  setenv("TZ", "CST-8", 1);
+  tzset();
+  Fixture f{};
+  f.configured = true;
+  f.currentUnix = 1780070220;  // 2026-05-29 23:57:00 Asia/Shanghai
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 60000;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+  TEST_ASSERT_EQUAL_UINT64(180000000ULL, f.sleepRequests[0].timerWakeupUs);
+}
+
 void test_system_mode_sleep_window_starts_after_home_render_completes() {
   Fixture f{};
   f.configured = true;
@@ -301,6 +317,7 @@ int main(int, char**) {
   RUN_TEST(test_ab_does_not_restart_when_force_config_flag_write_fails);
   RUN_TEST(test_system_mode_does_not_sleep_before_home_display_window);
   RUN_TEST(test_system_mode_sleeps_to_next_midnight_after_home_display_window);
+  RUN_TEST(test_system_mode_sleeps_to_local_midnight_after_manual_shanghai_time);
   RUN_TEST(test_system_mode_sleep_window_starts_after_home_render_completes);
   RUN_TEST(test_system_mode_uses_one_hour_sleep_when_time_is_not_trusted);
   RUN_TEST(test_system_mode_requests_sleep_only_once);

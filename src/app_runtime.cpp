@@ -8,6 +8,11 @@
 #include <esp_sleep.h>
 #include <time.h>
 
+#ifndef UNIT_TEST
+#include <driver/gpio.h>
+#include <esp_rom_gpio.h>
+#endif
+
 #include <cstdio>
 #include <cstdint>
 #include <memory>
@@ -23,6 +28,45 @@
 
 namespace homedeck {
 namespace {
+
+#ifndef UNIT_TEST
+void i2cBusRecovery() {
+  constexpr gpio_num_t kSclPin = GPIO_NUM_2;
+  constexpr gpio_num_t kSdaPin = GPIO_NUM_3;
+
+  gpio_config_t cfg;
+  cfg.pin_bit_mask = (1ULL << kSclPin) | (1ULL << kSdaPin);
+  cfg.mode = GPIO_MODE_INPUT_OUTPUT_OD;
+  cfg.pull_up_en = GPIO_PULLUP_ENABLE;
+  cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  cfg.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&cfg);
+
+  gpio_set_level(kSdaPin, 1);
+  gpio_set_level(kSclPin, 1);
+  esp_rom_delay_us(10);
+
+  for (int i = 0; i < 9; ++i) {
+    gpio_set_level(kSclPin, 0);
+    esp_rom_delay_us(5);
+    gpio_set_level(kSclPin, 1);
+    esp_rom_delay_us(5);
+    if (gpio_get_level(kSdaPin) == 1) {
+      break;
+    }
+  }
+
+  gpio_set_level(kSdaPin, 0);
+  esp_rom_delay_us(5);
+  gpio_set_level(kSclPin, 1);
+  esp_rom_delay_us(5);
+  gpio_set_level(kSdaPin, 1);
+  esp_rom_delay_us(5);
+
+  gpio_reset_pin(kSclPin);
+  gpio_reset_pin(kSdaPin);
+}
+#endif
 
 ConfigStore gConfigStore;
 HomeRenderer gHomeRenderer;
@@ -67,7 +111,20 @@ bool writeRtcUtc(time_t unixTime) {
     return false;
   }
   M5.Rtc.setDateTime(utc);
-  return true;
+
+  // 验证写入：立即读取 RTC 并比对，防止 I2C 静默失败
+  m5::rtc_datetime_t dt;
+  if (M5.Rtc.getDateTime(&dt)) {
+    if (dt.date.year == utc->tm_year + 1900 &&
+        dt.date.month == utc->tm_mon + 1 &&
+        dt.date.date == utc->tm_mday &&
+        dt.time.hours == utc->tm_hour &&
+        dt.time.minutes == utc->tm_min &&
+        dt.time.seconds == utc->tm_sec) {
+      return true;
+    }
+  }
+  return false;
 }
 
 TimeServiceDeps makeTimeDeps() {
@@ -155,6 +212,11 @@ BootControllerDeps makeBootDeps() {
       gTimeService->applyTimezone(defaultTimezone()->iana);
     }
     gTimeService->restoreSystemTimeFromRtc();
+    // M5Unified 的 setSystemTimeFromRtc() 有 getenv/setenv 悬空指针 bug，
+    // 会将 TZ 错误地恢复为 GMT0。必须在调用后重新应用时区。
+    if (!gTimeService->applyTimezone(config.timezoneIana)) {
+      gTimeService->applyTimezone(defaultTimezone()->iana);
+    }
   };
   deps.renderHome = renderHomeWithEnvironment;
   deps.updateButtons = []() { M5.update(); };
@@ -169,7 +231,15 @@ BootControllerDeps makeBootDeps() {
 }  // namespace
 
 void appSetup() {
-  M5.begin();
+#ifndef UNIT_TEST
+  if (esp_reset_reason() != ESP_RST_POWERON) {
+    i2cBusRecovery();
+  }
+#endif
+  auto cfg = M5.config();
+  cfg.clear_display = false;
+  M5.begin(cfg);
+  M5.Display.wakeup();
   gConfigStore.begin();
   gTimeService = std::make_unique<TimeService>(makeTimeDeps());
   gBootController = std::make_unique<BootController>(makeBootDeps());

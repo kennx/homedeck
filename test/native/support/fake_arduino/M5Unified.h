@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <cstring>
 #include <string>
@@ -55,6 +56,7 @@ struct FakeRtc {
   bool getDateTimeOk = false;
   bool setSystemTimeFromRtcCalled = false;
   bool setDateTimeCalled = false;
+  bool corruptTimezoneOnRestore = false;
   bool voltLow = false;
   m5::rtc_datetime_t dateTime{};
   std::tm lastSetTm{};
@@ -73,12 +75,23 @@ struct FakeRtc {
 
   void setSystemTimeFromRtc() {
     setSystemTimeFromRtcCalled = true;
+    if (corruptTimezoneOnRestore) {
+      setenv("TZ", "GMT0", 1);
+      tzset();
+    }
   }
 
   void setDateTime(const std::tm* datetime) {
     setDateTimeCalled = datetime != nullptr;
     if (datetime != nullptr) {
       lastSetTm = *datetime;
+      dateTime.date.year = static_cast<std::int16_t>(datetime->tm_year + 1900);
+      dateTime.date.month = static_cast<std::int8_t>(datetime->tm_mon + 1);
+      dateTime.date.date = static_cast<std::int8_t>(datetime->tm_mday);
+      dateTime.date.weekDay = static_cast<std::int8_t>(datetime->tm_wday);
+      dateTime.time.hours = static_cast<std::int8_t>(datetime->tm_hour);
+      dateTime.time.minutes = static_cast<std::int8_t>(datetime->tm_min);
+      dateTime.time.seconds = static_cast<std::int8_t>(datetime->tm_sec);
     }
   }
 
@@ -249,9 +262,14 @@ struct FakeDisplay {
   int directPngDrawCount = 0;
   int waitDisplayCount = 0;
   int sleepCount = 0;
+  int wakeupCount = 0;
 
   void sleep() {
     ++sleepCount;
+  }
+
+  void wakeup() {
+    ++wakeupCount;
   }
 
   static int lineHeightFor(FakeFontKind kind) {
@@ -709,6 +727,18 @@ struct FakePower {
   void setLed(uint8_t) {}
 };
 
+struct FakeM5Config {
+  bool clear_display = true;
+  bool output_power = true;
+  bool pmic_button = true;
+  bool internal_rtc = true;
+  bool internal_imu = true;
+  bool internal_spk = true;
+  bool internal_mic = true;
+  uint8_t led_brightness = 0;
+  int serial_baudrate = 0;
+};
+
 struct FakeM5Global {
   FakeRtc Rtc;
   FakeI2C In_I2C;
@@ -720,7 +750,14 @@ struct FakeM5Global {
   FakePower Power;
   int updateCount = 0;
 
+  FakeM5Config config() const {
+    return FakeM5Config{};
+  }
+
   void begin() {
+  }
+
+  void begin(const FakeM5Config&) {
   }
 
   void update() {

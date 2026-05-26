@@ -597,16 +597,13 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
   prepareScreen(canvas);
 
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
-    // 标题行：年 | 月 | 星期
+    // 标题行：年 |  | 月
     canvas.setTextColor(TFT_BLACK, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_left);
     canvas.drawString(formatCalendarYear(data.year).c_str(), kCalInsetX, kCalHeaderTopY);
 
-    canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalCenterX, kCalHeaderTopY);
-
     canvas.setTextDatum(textdatum_t::top_right);
-    canvas.drawString(formatCalendarWeekday(data.todayWeekday).c_str(), kCalRightX, kCalHeaderTopY);
+    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalRightX, kCalHeaderTopY);
 
     // 星期行
     canvas.setTextDatum(textdatum_t::middle_center);
@@ -658,12 +655,15 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
   }
 
   // 底部温湿度
-  HomeCalendarData envData{};
-  envData.temperatureAvailable = data.temperatureAvailable;
-  envData.temperatureCelsius = data.temperatureCelsius;
-  envData.humidityAvailable = data.humidityAvailable;
-  envData.humidityPercent = data.humidityPercent;
-  drawEnvironmentReadings(canvas, envData);
+  if (canvas.loadFont(generated::kDeviceFontVlw)) {
+    HomeCalendarData envData{};
+    envData.temperatureAvailable = data.temperatureAvailable;
+    envData.temperatureCelsius = data.temperatureCelsius;
+    envData.humidityAvailable = data.humidityAvailable;
+    envData.humidityPercent = data.humidityPercent;
+    drawEnvironmentReadings(canvas, envData);
+    canvas.unloadFont();
+  }
 
   pushScreen(canvas);
 }

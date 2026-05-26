@@ -332,6 +332,7 @@ void appSetup() {
   auto cfg = M5.config();
   cfg.clear_display = false;
   M5.begin(cfg);
+  M5.Display.setRotation(0);
   M5.Display.wakeup();
   gConfigStore.begin();
   gTimeService = std::make_unique<TimeService>(makeTimeDeps());

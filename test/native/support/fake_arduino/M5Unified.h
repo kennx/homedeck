@@ -566,6 +566,9 @@ struct FakeCanvas {
     if (parent != nullptr) {
       parent->fillScreenColor = color;
     }
+    prints.clear();
+    rects.clear();
+    pngDraws.clear();
   }
 
   void setColorDepth(int depth) {

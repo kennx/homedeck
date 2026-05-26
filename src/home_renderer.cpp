@@ -84,9 +84,6 @@ void drawLogo(M5Canvas& canvas, int top) {
 }
 
 void prepareScreen(M5Canvas& canvas) {
-  M5.Display.setRotation(0);
-  canvas.setColorDepth(16);
-  canvas.createSprite(M5.Display.width(), M5.Display.height());
   canvas.fillSprite(TFT_WHITE);
   canvas.setTextColor(TFT_BLACK, TFT_WHITE);
   canvas.setTextDatum(textdatum_t::middle_center);
@@ -94,8 +91,18 @@ void prepareScreen(M5Canvas& canvas) {
 
 void pushScreen(M5Canvas& canvas) {
   canvas.pushSprite(0, 0);
-  canvas.deleteSprite();
   M5.Display.waitDisplay();
+}
+
+M5Canvas& sprite() {
+  static M5Canvas canvas(&M5.Display);
+  static bool ready = false;
+  if (!ready) {
+    canvas.setColorDepth(16);
+    canvas.createSprite(M5.Display.width(), M5.Display.height());
+    ready = true;
+  }
+  return canvas;
 }
 
 void loadConfigPortalFont(M5Canvas& canvas) {
@@ -432,7 +439,7 @@ void HomeRenderer::render() {
 }
 
 void HomeRenderer::render(const HomeCalendarData& data) {
-  M5Canvas canvas(&M5.Display);
+  M5Canvas& canvas = sprite();
   prepareScreen(canvas);
 
   const std::uint16_t themeColor = data.isHoliday ? kRedColor : kGreenColor;
@@ -514,7 +521,7 @@ void HomeRenderer::render(const HomeCalendarData& data) {
 }
 
 void HomeRenderer::renderConfigPortal(const std::string& apSsid, const std::string& ipAddress) {
-  M5Canvas canvas(&M5.Display);
+  M5Canvas& canvas = sprite();
   prepareScreen(canvas);
 
   drawLogo(canvas, kLogoTopY);
@@ -597,7 +604,7 @@ int cellCenterX(int col) {
 }  // namespace
 
 void HomeRenderer::renderCalendar(const CalendarData& data) {
-  M5Canvas canvas(&M5.Display);
+  M5Canvas& canvas = sprite();
   prepareScreen(canvas);
 
   if (canvas.loadFont(generated::kDeviceFontVlw)) {

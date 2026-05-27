@@ -442,7 +442,7 @@ void HomeRenderer::render(const HomeCalendarData& data) {
   M5Canvas& canvas = sprite();
   prepareScreen(canvas);
 
-  const std::uint16_t themeColor = data.isHoliday ? kRedColor : kGreenColor;
+  const std::uint16_t themeColor = TFT_BLACK;
 
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(themeColor, TFT_WHITE);

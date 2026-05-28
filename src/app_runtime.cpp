@@ -236,15 +236,17 @@ void renderAlmanacWithOffset(int dayOffset) {
     return;
   }
 
-  // 计算目标日期：当前时间 + dayOffset 天
-  now += static_cast<std::time_t>(dayOffset) * 24 * 3600;
-  local = std::localtime(&now);
-  if (local == nullptr) {
+  // 复制当前的 tm 结构体
+  std::tm targetTm = *local;
+  targetTm.tm_mday += dayOffset;
+
+  // 使用 mktime 规范化时间结构，自动处理跨天、跨月、跨年及夏令时转换
+  if (std::mktime(&targetTm) == -1) {
     gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment());
     return;
   }
 
-  HomeCalendarData data = makeHomeCalendarData(*local);
+  HomeCalendarData data = makeHomeCalendarData(targetTm);
   const EnvironmentReading reading = readSht40Environment();
   if (reading.ok) {
     data.temperatureAvailable = true;

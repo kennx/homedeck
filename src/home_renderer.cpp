@@ -771,6 +771,14 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
     canvas.unloadFont();
   }
 
+  // 最后一周下方分割线：与实际最后一行对齐，左右各缩进 12px，距最后一行底部 12px
+  const int actualRows = (firstWeekday + monthDays + 6) / 7;
+  const int lastRowBottomY = kCalDateStartY + actualRows * kCalDateRowHeight;
+  const int sepY = lastRowBottomY + 12;
+  const int sepLeftX = 12;
+  const int sepRightX = M5.Display.width() - 12;
+  canvas.drawFastHLine(sepLeftX, sepY, sepRightX - sepLeftX, TFT_BLACK);
+
   // 底部温湿度
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(TFT_BLACK, TFT_WHITE);

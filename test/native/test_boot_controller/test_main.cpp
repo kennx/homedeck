@@ -421,6 +421,50 @@ void test_month_click_ignored_in_almanac() {
   TEST_ASSERT_EQUAL(0, static_cast<int>(f.calendarOffsets.size()));
 }
 
+void test_prev_day_click_in_almanac() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  TEST_ASSERT_EQUAL(homedeck::SystemView::Almanac, controller.currentView());
+
+  f.prevMonthClicked = true;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.almanacOffsets.size()));
+  TEST_ASSERT_EQUAL(-1, f.almanacOffsets[0]);
+}
+
+void test_next_day_click_in_almanac() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.nextMonthClicked = true;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.almanacOffsets.size()));
+  TEST_ASSERT_EQUAL(1, f.almanacOffsets[0]);
+}
+
+void test_day_click_ignored_in_calendar() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.calendarButtonClickCount = 1;
+  controller.update();
+  f.calendarButtonClickCount = 0;
+
+  f.prevMonthClicked = true;
+  controller.update();
+
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.almanacOffsets.size()));
+}
+
 void test_continuous_prev_month_clicks() {
   Fixture f{};
   f.configured = true;

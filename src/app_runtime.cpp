@@ -228,6 +228,34 @@ void renderCalendarWithOffset(int monthOffset) {
   gHomeRenderer.renderCalendar(data);
 }
 
+void renderAlmanacWithOffset(int dayOffset) {
+  std::time_t now = time(nullptr);
+  std::tm* local = now > 0 ? std::localtime(&now) : nullptr;
+  if (local == nullptr) {
+    gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment());
+    return;
+  }
+
+  // 计算目标日期：当前时间 + dayOffset 天
+  now += static_cast<std::time_t>(dayOffset) * 24 * 3600;
+  local = std::localtime(&now);
+  if (local == nullptr) {
+    gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment());
+    return;
+  }
+
+  HomeCalendarData data = makeHomeCalendarData(*local);
+  const EnvironmentReading reading = readSht40Environment();
+  if (reading.ok) {
+    data.temperatureAvailable = true;
+    data.temperatureCelsius = reading.temperatureCelsius;
+    data.humidityAvailable = true;
+    data.humidityPercent = reading.humidityPercent;
+  }
+
+  gHomeRenderer.render(data);
+}
+
 void renderHomeWithDeepSleepMessage() {
   HomeCalendarData data = makeCurrentHomeCalendarData();
   data.bottomCenterMessage = "DEEP SLEEP";
@@ -304,6 +332,7 @@ BootControllerDeps makeBootDeps() {
   deps.renderAlmanac = renderHomeWithEnvironment;
   deps.renderCalendar = renderCalendarWithEnvironment;
   deps.renderCalendarWithOffset = renderCalendarWithOffset;
+  deps.renderAlmanacWithOffset = renderAlmanacWithOffset;
   deps.getCalendarButtonClickCount = []() -> int {
     if (M5.BtnC.wasDecideClickCount()) {
       return static_cast<int>(M5.BtnC.getClickCount());

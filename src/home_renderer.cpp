@@ -167,7 +167,7 @@ void drawEnvironmentReadings(M5Canvas& canvas, const HomeCalendarData& data) {
   const std::string temperature = formatTemperatureText(data);
   canvas.drawString(temperature.c_str(), kEnvironmentTextLeftX, bottomY);
 
-  if (data.bottomCenterMessage == "DEEP SLEEP") {
+  if (!data.bottomCenterMessage.empty()) {
     canvas.setTextDatum(textdatum_t::bottom_center);
     canvas.drawString(data.bottomCenterMessage.c_str(), kCalendarCenterX, bottomY);
   }
@@ -779,6 +779,7 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
     envData.temperatureCelsius = data.temperatureCelsius;
     envData.humidityAvailable = data.humidityAvailable;
     envData.humidityPercent = data.humidityPercent;
+    envData.bottomCenterMessage = data.bottomCenterMessage;
     drawEnvironmentReadings(canvas, envData);
     canvas.unloadFont();
   }

@@ -37,6 +37,7 @@ struct CalendarData {
   float temperatureCelsius = 0.0f;
   bool humidityAvailable = false;
   float humidityPercent = 0.0f;
+  std::string bottomCenterMessage;
 };
 
 CalendarData makeCalendarData(const std::tm& localTime);

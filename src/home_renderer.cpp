@@ -588,43 +588,44 @@ CalendarData makeCalendarData(const std::tm& localTime) {
   }
 
   AlmanacProvider provider;
-  AlmanacDayData almanac{};
-  if (provider.lookup(data.year, data.month, data.day, &almanac)) {
-    data.lunarDate = almanac.lunarDate;
-    data.solarTerm = almanac.solarTerm;
-    data.festival = lookupLunarFestival(almanac.lunarDate);
-  }
-
-  // 向后查找下两个节气或节日（最多查 180 天）
+  std::vector<AlmanacLookupDate> dates;
+  dates.reserve(181);
+  dates.push_back({data.year, data.month, data.day});
   std::tm searchTm = localTime;
-  bool foundFirst = false;
   for (int offset = 1; offset <= 180; ++offset) {
     searchTm.tm_mday += 1;
     searchTm.tm_hour = 12;
     std::mktime(&searchTm);
+    dates.push_back({searchTm.tm_year + 1900, searchTm.tm_mon + 1, searchTm.tm_mday});
+  }
 
-    AlmanacDayData nextAlmanac{};
-    if (!provider.lookup(searchTm.tm_year + 1900, searchTm.tm_mon + 1, searchTm.tm_mday, &nextAlmanac)) {
-      continue;
+  bool foundFirst = false;
+  provider.lookupEach(dates.data(), dates.size(), [&](const AlmanacLookupDate& date, const AlmanacDayData& almanac) {
+    if (date.year == data.year && date.month == data.month && date.day == data.day) {
+      data.lunarDate = almanac.lunarDate;
+      data.solarTerm = almanac.solarTerm;
+      data.festival = lookupLunarFestival(almanac.lunarDate);
+      return false;
     }
 
-    const std::string nextFestival = lookupLunarFestival(nextAlmanac.lunarDate);
-    if (!nextAlmanac.solarTerm.empty() || !nextFestival.empty()) {
+    const std::string nextFestival = lookupLunarFestival(almanac.lunarDate);
+    if (!almanac.solarTerm.empty() || !nextFestival.empty()) {
       if (!foundFirst) {
-        data.nextSpecialMonth = searchTm.tm_mon + 1;
-        data.nextSpecialDay = searchTm.tm_mday;
-        data.nextSpecialTerm = nextAlmanac.solarTerm;
+        data.nextSpecialMonth = date.month;
+        data.nextSpecialDay = date.day;
+        data.nextSpecialTerm = almanac.solarTerm;
         data.nextSpecialFestival = nextFestival;
         foundFirst = true;
       } else {
-        data.secondSpecialMonth = searchTm.tm_mon + 1;
-        data.secondSpecialDay = searchTm.tm_mday;
-        data.secondSpecialTerm = nextAlmanac.solarTerm;
+        data.secondSpecialMonth = date.month;
+        data.secondSpecialDay = date.day;
+        data.secondSpecialTerm = almanac.solarTerm;
         data.secondSpecialFestival = nextFestival;
-        break;
+        return true;
       }
     }
-  }
+    return false;
+  });
 
   // 写入缓存
   gAlmanacCache.year = data.year;

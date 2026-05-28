@@ -117,8 +117,6 @@ void initRgbLed() {
 void prepareEpdAfterWakeup() {
   M5.Display.setEpdMode(epd_mode_t::epd_quality);
   M5.Display.wakeup();
-  M5.Display.clear(TFT_WHITE);
-  M5.Display.waitDisplay();
   M5.Display.setEpdMode(epd_mode_t::epd_fast);
 }
 

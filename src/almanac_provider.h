@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <string>
 
 namespace homedeck {
@@ -17,9 +19,19 @@ struct AlmanacDayData {
   std::string ji;
 };
 
+struct AlmanacLookupDate {
+  int year = 0;
+  int month = 0;
+  int day = 0;
+};
+
+using AlmanacLookupCallback =
+    std::function<bool(const AlmanacLookupDate& date, const AlmanacDayData& data)>;
+
 class AlmanacProvider {
  public:
   bool lookup(int year, int month, int day, AlmanacDayData* out) const;
+  bool lookupEach(const AlmanacLookupDate* dates, std::size_t count, const AlmanacLookupCallback& callback) const;
 };
 
 }  // namespace homedeck

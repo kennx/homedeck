@@ -382,13 +382,13 @@ bool decodeRecord(
   return true;
 }
 
-bool lookupInFile(File& file, int year, int month, int day, AlmanacDayData& out) {
-  AlmanacHeader header;
-  if (!readHeader(file, header) || !verifyPayloadCrc(file, header) ||
-      !validateRecordOffsetTableEnd(file, header)) {
-    return false;
-  }
-
+bool lookupInValidatedFile(
+    File& file,
+    const AlmanacHeader& header,
+    int year,
+    int month,
+    int day,
+    AlmanacDayData& out) {
   std::uint32_t dayOffset = 0;
   if (!dateOffset(header, year, month, day, dayOffset)) {
     return false;
@@ -400,6 +400,18 @@ bool lookupInFile(File& file, int year, int month, int day, AlmanacDayData& out)
     return false;
   }
   return decodeRecord(file, header, recordStart, recordEnd, out);
+}
+
+bool prepareValidatedFile(File& file, AlmanacHeader& header) {
+  return readHeader(file, header) && verifyPayloadCrc(file, header) && validateRecordOffsetTableEnd(file, header);
+}
+
+bool lookupInFile(File& file, int year, int month, int day, AlmanacDayData& out) {
+  AlmanacHeader header;
+  if (!prepareValidatedFile(file, header)) {
+    return false;
+  }
+  return lookupInValidatedFile(file, header, year, month, day, out);
 }
 
 }  // namespace
@@ -422,6 +434,39 @@ bool AlmanacProvider::lookup(int year, int month, int day, AlmanacDayData* out) 
   }
   LittleFS.end();
   return result;
+}
+
+bool AlmanacProvider::lookupEach(
+    const AlmanacLookupDate* dates,
+    std::size_t count,
+    const AlmanacLookupCallback& callback) const {
+  if (dates == nullptr || callback == nullptr) {
+    return false;
+  }
+
+  if (!LittleFS.begin()) {
+    LittleFS.end();
+    return false;
+  }
+
+  File file = LittleFS.open(kAlmanacPath, "r");
+  bool anyFound = false;
+  bool stop = false;
+  if (file) {
+    AlmanacHeader header;
+    if (prepareValidatedFile(file, header)) {
+      for (std::size_t i = 0; i < count && !stop; ++i) {
+        AlmanacDayData day{};
+        if (lookupInValidatedFile(file, header, dates[i].year, dates[i].month, dates[i].day, day)) {
+          anyFound = true;
+          stop = callback(dates[i], day);
+        }
+      }
+    }
+    file.close();
+  }
+  LittleFS.end();
+  return anyFound;
 }
 
 }  // namespace homedeck

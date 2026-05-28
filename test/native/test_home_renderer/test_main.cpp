@@ -96,6 +96,23 @@ void test_home_calendar_data_uses_almanac_package_when_available() {
   TEST_ASSERT_EQUAL_STRING("嫁娶", data.ji.c_str());
 }
 
+void test_calendar_data_reads_almanac_file_once_for_lookahead_scan() {
+  fakeLittleFSSetFile("/almanac.bin", homedeck::test::buildSingleDayFixturePackage());
+
+  std::tm local{};
+  local.tm_year = 1900 - 1900;
+  local.tm_mon = 0;
+  local.tm_mday = 1;
+  local.tm_wday = 1;
+
+  const auto data = homedeck::makeCalendarData(local);
+
+  TEST_ASSERT_EQUAL_STRING("腊月初一", data.lunarDate.c_str());
+  TEST_ASSERT_EQUAL(1, LittleFS.beginCount);
+  TEST_ASSERT_EQUAL(1, LittleFS.openCount);
+  TEST_ASSERT_EQUAL(1, LittleFS.endCount);
+}
+
 void test_home_calendar_data_uses_placeholder_for_empty_almanac_actions() {
   auto day = homedeck::test::singleDayFixture();
   day.yi.clear();
@@ -584,6 +601,7 @@ void test_calendar_draws_bottom_center_message_when_present() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_home_calendar_data_uses_almanac_package_when_available);
+  RUN_TEST(test_calendar_data_reads_almanac_file_once_for_lookahead_scan);
   RUN_TEST(test_home_calendar_data_uses_placeholder_for_empty_almanac_actions);
   RUN_TEST(test_home_calendar_data_keeps_public_date_when_almanac_missing);
   RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);

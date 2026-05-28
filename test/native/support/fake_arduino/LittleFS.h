@@ -61,15 +61,18 @@ using File = FakeFile;
 class LittleFSClass {
  public:
   bool begin() {
+    ++beginCount;
     began = true;
     return beginSucceeds;
   }
 
   void end() {
+    ++endCount;
     ended = true;
   }
 
   File open(const char* path, const char* mode = "r") {
+    ++openCount;
     (void)mode;
     if (path == nullptr) {
       return {};
@@ -88,6 +91,9 @@ class LittleFSClass {
   bool beginSucceeds = true;
   bool began = false;
   bool ended = false;
+  int beginCount = 0;
+  int endCount = 0;
+  int openCount = 0;
   std::map<std::string, std::vector<std::uint8_t>> files;
 };
 
@@ -97,6 +103,9 @@ inline void fakeLittleFSReset() {
   LittleFS.beginSucceeds = true;
   LittleFS.began = false;
   LittleFS.ended = false;
+  LittleFS.beginCount = 0;
+  LittleFS.endCount = 0;
+  LittleFS.openCount = 0;
   LittleFS.files.clear();
 }
 

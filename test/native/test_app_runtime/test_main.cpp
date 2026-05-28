@@ -59,23 +59,17 @@ bool hasDeepSleepPrint() {
   return false;
 }
 
-bool hasEpdBaselineRefreshSequence() {
+bool hasNonBlockingEpdWakeupSequence() {
   using Event = FakeDisplay::FakeEpdEvent;
   const auto& events = M5.Display.epdEvents;
-  for (std::size_t i = 0; i + 4 < events.size(); ++i) {
+  for (std::size_t i = 0; i + 2 < events.size(); ++i) {
     if (events[i].type != Event::Type::SetMode || events[i].mode != epd_mode_t::epd_quality) {
       continue;
     }
     if (events[i + 1].type != Event::Type::Wakeup) {
       continue;
     }
-    if (events[i + 2].type != Event::Type::Clear || events[i + 2].color != TFT_WHITE) {
-      continue;
-    }
-    if (events[i + 3].type != Event::Type::WaitDisplay) {
-      continue;
-    }
-    if (events[i + 4].type != Event::Type::SetMode || events[i + 4].mode != epd_mode_t::epd_fast) {
+    if (events[i + 2].type != Event::Type::SetMode || events[i + 2].mode != epd_mode_t::epd_fast) {
       continue;
     }
     return true;
@@ -173,10 +167,11 @@ void test_app_setup_reapplies_timezone_after_rtc_restore() {
   TEST_ASSERT_EQUAL_STRING("CST-8", std::getenv("TZ"));
 }
 
-void test_prepare_epd_after_wakeup_performs_quality_baseline_refresh_before_fast_mode() {
+void test_prepare_epd_after_wakeup_uses_non_blocking_wakeup_sequence() {
   homedeck::prepareEpdAfterWakeupForTest();
 
-  TEST_ASSERT_TRUE(hasEpdBaselineRefreshSequence());
+  TEST_ASSERT_TRUE(hasNonBlockingEpdWakeupSequence());
+  TEST_ASSERT_EQUAL(0, M5.Display.waitDisplayCount);
 }
 
 void test_init_rgb_led_enables_power_and_keeps_pixels_off() {
@@ -354,7 +349,7 @@ int main(int, char**) {
   RUN_TEST(test_enter_home_deep_sleep_does_not_touch_i2c);
   RUN_TEST(test_shutdown_rgb_led_for_sleep_turns_off_rgb_pixels_and_ldo);
   RUN_TEST(test_app_setup_reapplies_timezone_after_rtc_restore);
-  RUN_TEST(test_prepare_epd_after_wakeup_performs_quality_baseline_refresh_before_fast_mode);
+  RUN_TEST(test_prepare_epd_after_wakeup_uses_non_blocking_wakeup_sequence);
   RUN_TEST(test_init_rgb_led_enables_power_and_keeps_pixels_off);
   RUN_TEST(test_sync_ntp_waits_for_sntp_completion_even_when_clock_is_already_modern);
   RUN_TEST(test_sync_ntp_returns_time_after_sntp_completion);

@@ -510,12 +510,60 @@ HomeCalendarData makeCurrentHomeCalendarData() {
   return makeHomeCalendarData(local != nullptr ? *local : fallbackLocalTime());
 }
 
+std::string lookupLunarFestival(const std::string& lunarDate) {
+  static const std::unordered_map<std::string, std::string> kFestivals = {
+      {"正月初一", "春节"},
+      {"正月十五", "元宵节"},
+      {"五月初五", "端午节"},
+      {"七月初七", "七夕"},
+      {"七月十五", "中元节"},
+      {"八月十五", "中秋节"},
+      {"九月初九", "重阳节"},
+      {"腊月初八", "腊八节"},
+      {"腊月廿三", "小年"},
+      {"腊月廿四", "小年"},
+  };
+  auto it = kFestivals.find(lunarDate);
+  return (it != kFestivals.end()) ? it->second : "";
+}
+
 CalendarData makeCalendarData(const std::tm& localTime) {
   CalendarData data{};
   data.year = localTime.tm_year + 1900;
   data.month = localTime.tm_mon + 1;
   data.day = localTime.tm_mday;
   data.todayWeekday = localTime.tm_wday;
+
+  AlmanacProvider provider;
+  AlmanacDayData almanac{};
+  if (provider.lookup(data.year, data.month, data.day, &almanac)) {
+    data.lunarDate = almanac.lunarDate;
+    data.solarTerm = almanac.solarTerm;
+    data.festival = lookupLunarFestival(almanac.lunarDate);
+  }
+
+  // 向后查找下一个节气或节日（最多查 90 天）
+  std::tm searchTm = localTime;
+  for (int offset = 1; offset <= 90; ++offset) {
+    searchTm.tm_mday += 1;
+    searchTm.tm_hour = 12;
+    std::mktime(&searchTm);
+
+    AlmanacDayData nextAlmanac{};
+    if (!provider.lookup(searchTm.tm_year + 1900, searchTm.tm_mon + 1, searchTm.tm_mday, &nextAlmanac)) {
+      continue;
+    }
+
+    const std::string nextFestival = lookupLunarFestival(nextAlmanac.lunarDate);
+    if (!nextAlmanac.solarTerm.empty() || !nextFestival.empty()) {
+      data.nextSpecialMonth = searchTm.tm_mon + 1;
+      data.nextSpecialDay = searchTm.tm_mday;
+      data.nextSpecialTerm = nextAlmanac.solarTerm;
+      data.nextSpecialFestival = nextFestival;
+      break;
+    }
+  }
+
   return data;
 }
 
@@ -778,6 +826,45 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
   const int sepLeftX = 12;
   const int sepRightX = M5.Display.width() - 12;
   canvas.drawFastHLine(sepLeftX, sepY, sepRightX - sepLeftX, TFT_BLACK);
+
+  // 分割线下方：公历 + 农历 + 节日（左），节气（右）
+  if (canvas.loadFont(generated::kDeviceFontVlw)) {
+    canvas.setTextColor(TFT_BLACK, TFT_WHITE);
+
+    std::string leftText = std::to_string(data.month) + "月" + std::to_string(data.day) + "日";
+    if (!data.lunarDate.empty()) {
+      leftText += " 农历" + data.lunarDate;
+    }
+    if (!data.festival.empty()) {
+      leftText += " " + data.festival;
+    }
+
+    const int infoY = sepY + 10;
+    canvas.setTextDatum(textdatum_t::top_left);
+    canvas.drawString(leftText.c_str(), sepLeftX, infoY);
+
+    if (!data.solarTerm.empty()) {
+      canvas.setTextDatum(textdatum_t::top_right);
+      canvas.drawString(data.solarTerm.c_str(), sepRightX, infoY);
+    }
+
+    // 第二行：下一个节气或节日
+    if (data.nextSpecialMonth > 0) {
+      std::string nextLine = std::to_string(data.nextSpecialMonth) + "月" +
+                             std::to_string(data.nextSpecialDay) + "日";
+      if (!data.nextSpecialTerm.empty()) {
+        nextLine += data.nextSpecialTerm;
+      }
+      if (!data.nextSpecialFestival.empty()) {
+        if (!data.nextSpecialTerm.empty()) {
+          nextLine += "、";
+        }
+        nextLine += data.nextSpecialFestival;
+      }
+      canvas.setTextDatum(textdatum_t::top_left);
+      canvas.drawString(nextLine.c_str(), sepLeftX, infoY + 22);
+    }
+  }
 
   // 底部温湿度
   if (canvas.loadFont(generated::kDeviceFontVlw)) {

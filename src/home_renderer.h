@@ -38,6 +38,13 @@ struct CalendarData {
   bool humidityAvailable = false;
   float humidityPercent = 0.0f;
   std::string bottomCenterMessage;
+  std::string lunarDate;
+  std::string solarTerm;
+  std::string festival;
+  int nextSpecialMonth = 0;
+  int nextSpecialDay = 0;
+  std::string nextSpecialTerm;
+  std::string nextSpecialFestival;
 };
 
 CalendarData makeCalendarData(const std::tm& localTime);

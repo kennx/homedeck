@@ -179,3 +179,4 @@ void enterHomeDeepSleep(const HomeSleepRequest& request) {
 | `src/app_runtime.cpp` | 修改 | 绑定 `preSleepRender` lambda + 删除 `renderHomeWithDeepSleepMessage()` + 简化 `enterHomeDeepSleep()` |
 | `test/native/test_boot_controller/test_main.cpp` | 修改 | 新增 4 个测试 + Fixture 新增 mock 桩 |
 | `test/native/test_home_renderer/test_main.cpp` | 修改 | 更新现有测试数据 + 新增日历底部文字测试 |
+| `test/native/test_app_runtime/test_main.cpp` | 修改 | 更新 deep sleep 测试（移除渲染断言，调整 waitDisplayCount） |

@@ -258,12 +258,6 @@ void renderAlmanacWithOffset(int dayOffset) {
   gHomeRenderer.render(data);
 }
 
-void renderHomeWithDeepSleepMessage() {
-  HomeCalendarData data = makeCurrentHomeCalendarData();
-  data.bottomCenterMessage = "DEEP SLEEP";
-  gHomeRenderer.render(data);
-}
-
 }  // namespace
 
 #ifdef UNIT_TEST
@@ -300,7 +294,6 @@ void enterHomeDeepSleep(const HomeSleepRequest& request) {
   if (esp_sleep_enable_ext0_wakeup(wakeupGpio, request.wakeOnLow ? 0 : 1) != ESP_OK) {
     return;
   }
-  renderHomeWithDeepSleepMessage();
   M5.Display.sleep();
   M5.Display.waitDisplay();
   M5.Power.deepSleep(request.timerWakeupUs, false);
@@ -348,6 +341,24 @@ BootControllerDeps makeBootDeps() {
   deps.millis = []() { return millis(); };
   deps.restart = []() { ESP.restart(); };
   deps.currentTime = []() { return time(nullptr); };
+  deps.preSleepRender = [](homedeck::SystemView view) {
+    time_t now = time(nullptr);
+    tm* local = localtime(&now);
+    char timeStr[6] = {};
+    if (local != nullptr) {
+      snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
+    }
+
+    if (view == homedeck::SystemView::Almanac) {
+      HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment();
+      data.bottomCenterMessage = timeStr;
+      gHomeRenderer.render(data);
+    } else {
+      CalendarData data = makeCurrentCalendarData();
+      data.bottomCenterMessage = timeStr;
+      gHomeRenderer.renderCalendar(data);
+    }
+  };
   deps.enterDeepSleep = enterHomeDeepSleep;
   return deps;
 }

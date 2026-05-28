@@ -177,6 +177,16 @@ ConfigValidationResult saveSubmittedConfig(
   return ConfigValidationResult{};
 }
 
+std::string formatCurrentTimeHHMM() {
+  time_t now = time(nullptr);
+  tm* local = localtime(&now);
+  char timeStr[6] = {};
+  if (local != nullptr) {
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
+  }
+  return timeStr;
+}
+
 HomeCalendarData makeCurrentHomeCalendarDataWithEnvironment(const std::string& bottomCenterMessage = {}) {
   HomeCalendarData data = makeCurrentHomeCalendarData();
   const EnvironmentReading reading = readSht40Environment();
@@ -191,11 +201,13 @@ HomeCalendarData makeCurrentHomeCalendarDataWithEnvironment(const std::string& b
 }
 
 void renderHomeWithEnvironment() {
-  gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment());
+  gHomeRenderer.render(makeCurrentHomeCalendarDataWithEnvironment(formatCurrentTimeHHMM()));
 }
 
 void renderCalendarWithEnvironment() {
-  gHomeRenderer.renderCalendar(makeCurrentCalendarData());
+  CalendarData data = makeCurrentCalendarData();
+  data.bottomCenterMessage = formatCurrentTimeHHMM();
+  gHomeRenderer.renderCalendar(data);
 }
 
 void renderCalendarWithOffset(int monthOffset) {
@@ -224,7 +236,7 @@ void renderCalendarWithOffset(int monthOffset) {
   data.day = (monthOffset == 0) ? local->tm_mday : 0;
 
   applySht40ToCalendar(data);
-
+  data.bottomCenterMessage = formatCurrentTimeHHMM();
   gHomeRenderer.renderCalendar(data);
 }
 
@@ -254,7 +266,7 @@ void renderAlmanacWithOffset(int dayOffset) {
     data.humidityAvailable = true;
     data.humidityPercent = reading.humidityPercent;
   }
-
+  data.bottomCenterMessage = formatCurrentTimeHHMM();
   gHomeRenderer.render(data);
 }
 
@@ -342,20 +354,16 @@ BootControllerDeps makeBootDeps() {
   deps.restart = []() { ESP.restart(); };
   deps.currentTime = []() { return time(nullptr); };
   deps.preSleepRender = [](homedeck::SystemView view) {
-    time_t now = time(nullptr);
-    tm* local = localtime(&now);
-    char timeStr[6] = {};
-    if (local != nullptr) {
-      snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
-    }
-
     if (view == homedeck::SystemView::Almanac) {
-      HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment();
-      data.bottomCenterMessage = timeStr;
+      HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment("--:--");
+      data.temperatureAvailable = false;
+      data.humidityAvailable = false;
       gHomeRenderer.render(data);
     } else {
       CalendarData data = makeCurrentCalendarData();
-      data.bottomCenterMessage = timeStr;
+      data.bottomCenterMessage = "--:--";
+      data.temperatureAvailable = false;
+      data.humidityAvailable = false;
       gHomeRenderer.renderCalendar(data);
     }
   };

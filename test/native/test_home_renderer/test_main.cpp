@@ -381,7 +381,7 @@ void test_home_renderer_does_not_draw_bottom_center_message_by_default() {
 
 void test_home_renderer_draws_bottom_center_message_when_present() {
   auto data = figmaCalendarData();
-  data.bottomCenterMessage = "DEEP SLEEP";
+  data.bottomCenterMessage = "14:30";
   data.temperatureAvailable = true;
   data.temperatureCelsius = 30.04f;
   data.humidityAvailable = true;
@@ -394,7 +394,7 @@ void test_home_renderer_draws_bottom_center_message_when_present() {
   bool foundTemperature = false;
   bool foundHumidity = false;
   for (const auto& print : M5.Display.prints) {
-    if (print.text == "DEEP SLEEP") {
+    if (print.text == "14:30") {
       TEST_ASSERT_EQUAL(200, print.x);
       TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
       TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_center), print.datum);
@@ -425,15 +425,15 @@ void test_home_renderer_draws_bottom_center_message_when_present() {
   TEST_ASSERT_TRUE(foundHumidity);
 }
 
-void test_home_renderer_does_not_draw_bottom_center_message_for_other_text() {
+void test_home_renderer_does_not_draw_bottom_center_message_when_empty() {
   auto data = figmaCalendarData();
-  data.bottomCenterMessage = "HELLO";
+  data.bottomCenterMessage = "";
   homedeck::HomeRenderer renderer;
 
   renderer.render(data);
 
   for (const auto& print : M5.Display.prints) {
-    TEST_ASSERT_FALSE(print.text == "DEEP SLEEP");
+    TEST_ASSERT_FALSE(print.text == "14:30");
   }
 }
 
@@ -544,6 +544,43 @@ void test_calendar_renders_past_month_correctly() {
   TEST_ASSERT_TRUE(foundMonth);
 }
 
+void test_calendar_draws_bottom_center_message_when_present() {
+  homedeck::CalendarData data;
+  data.year = 2026;
+  data.month = 5;
+  data.day = 28;
+  data.bottomCenterMessage = "09:15";
+  data.temperatureAvailable = true;
+  data.temperatureCelsius = 25.5f;
+  data.humidityAvailable = true;
+  data.humidityPercent = 60.0f;
+
+  homedeck::HomeRenderer renderer;
+  renderer.renderCalendar(data);
+
+  bool foundMessage = false;
+  bool foundTemperature = false;
+  bool foundHumidity = false;
+  for (const auto& print : M5.Display.prints) {
+    if (print.text == "09:15") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(kEnvironmentTextBottomY, print.y);
+      TEST_ASSERT_EQUAL(static_cast<int>(textdatum_t::bottom_center), print.datum);
+      foundMessage = true;
+    }
+    if (print.text == "25.5°C") {
+      foundTemperature = true;
+    }
+    if (print.text == "60.0%") {
+      foundHumidity = true;
+    }
+  }
+
+  TEST_ASSERT_TRUE(foundMessage);
+  TEST_ASSERT_TRUE(foundTemperature);
+  TEST_ASSERT_TRUE(foundHumidity);
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_home_calendar_data_uses_almanac_package_when_available);
@@ -557,10 +594,11 @@ int main(int, char**) {
   RUN_TEST(test_home_renderer_draws_environment_placeholders_when_unavailable);
   RUN_TEST(test_home_renderer_does_not_draw_bottom_center_message_by_default);
   RUN_TEST(test_home_renderer_draws_bottom_center_message_when_present);
-  RUN_TEST(test_home_renderer_does_not_draw_bottom_center_message_for_other_text);
+  RUN_TEST(test_home_renderer_does_not_draw_bottom_center_message_when_empty);
   RUN_TEST(test_home_renderer_limits_yi_and_ji_to_two_lines);
   RUN_TEST(test_home_renderer_draws_config_portal_layout);
   RUN_TEST(test_calendar_no_highlight_when_day_is_zero);
   RUN_TEST(test_calendar_renders_past_month_correctly);
+  RUN_TEST(test_calendar_draws_bottom_center_message_when_present);
   return UNITY_END();
 }

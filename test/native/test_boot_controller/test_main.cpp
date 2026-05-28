@@ -30,6 +30,8 @@ struct Fixture {
   std::vector<homedeck::HomeSleepRequest> sleepRequests;
   std::vector<int> calendarOffsets;
   std::vector<int> almanacOffsets;
+  std::vector<homedeck::SystemView> preSleepRenderViews;
+  bool preSleepRenderCalled = false;
 
   homedeck::BootControllerDeps deps() {
     homedeck::BootControllerDeps deps{};
@@ -71,6 +73,10 @@ struct Fixture {
     deps.millis = [this]() { return now; };
     deps.restart = [this]() { restarted = true; };
     deps.currentTime = [this]() { return currentUnix; };
+    deps.preSleepRender = [this](homedeck::SystemView view) {
+      preSleepRenderCalled = true;
+      preSleepRenderViews.push_back(view);
+    };
     deps.enterDeepSleep = [this](const homedeck::HomeSleepRequest& request) {
       sleepRequests.push_back(request);
     };
@@ -373,6 +379,67 @@ void test_double_click_ignored_in_almanac() {
   controller.update();
 
   TEST_ASSERT_EQUAL(0, static_cast<int>(f.calendarOffsets.size()));
+}
+
+void test_offsets_reset_before_deep_sleep() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.calendarButtonClickCount = 1;
+  controller.update();
+  f.calendarButtonClickCount = 0;
+  f.prevMonthClicked = true;
+  controller.update();
+  f.prevMonthClicked = false;
+
+  f.prevMonthClicked = true;
+  controller.update();
+  f.prevMonthClicked = false;
+
+  f.calendarOffsets.clear();
+  f.almanacOffsets.clear();
+
+  f.now = 300000;
+  controller.update();
+
+  TEST_ASSERT_TRUE(f.preSleepRenderCalled);
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.calendarOffsets.size()));
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.almanacOffsets.size()));
+}
+
+void test_preSleepRender_called_before_deep_sleep() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.now = 300000;
+  controller.update();
+
+  TEST_ASSERT_TRUE(f.preSleepRenderCalled);
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.preSleepRenderViews.size()));
+  TEST_ASSERT_EQUAL(homedeck::SystemView::Almanac, f.preSleepRenderViews[0]);
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.sleepRequests.size()));
+}
+
+void test_preSleepRender_receives_calendar_view() {
+  Fixture f{};
+  f.configured = true;
+  homedeck::BootController controller{f.deps()};
+  controller.begin();
+
+  f.calendarButtonClickCount = 1;
+  controller.update();
+  f.calendarButtonClickCount = 0;
+
+  f.now = 300000;
+  controller.update();
+
+  TEST_ASSERT_TRUE(f.preSleepRenderCalled);
+  TEST_ASSERT_EQUAL(1, static_cast<int>(f.preSleepRenderViews.size()));
+  TEST_ASSERT_EQUAL(homedeck::SystemView::Calendar, f.preSleepRenderViews[0]);
 }
 
 void test_prev_month_click_in_calendar() {
@@ -699,6 +766,9 @@ int main(int, char**) {
   RUN_TEST(test_double_click_ignored_in_almanac);
   RUN_TEST(test_prev_month_click_in_calendar);
   RUN_TEST(test_next_month_click_in_calendar);
+  RUN_TEST(test_offsets_reset_before_deep_sleep);
+  RUN_TEST(test_preSleepRender_called_before_deep_sleep);
+  RUN_TEST(test_preSleepRender_receives_calendar_view);
   RUN_TEST(test_month_click_ignored_in_almanac);
   RUN_TEST(test_continuous_prev_month_clicks);
   RUN_TEST(test_month_click_resets_sleep_timer);

@@ -5,8 +5,8 @@ namespace homedeck {
 ViewManager::ViewManager(ViewManagerDeps deps) : deps_(std::move(deps)) {
 }
 
-void ViewManager::begin() {
-  switchTo(SystemView::Almanac);
+void ViewManager::begin(SystemView initialView) {
+  switchTo(initialView);
 }
 
 void ViewManager::switchToNextView() {

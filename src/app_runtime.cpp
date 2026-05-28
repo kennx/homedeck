@@ -12,6 +12,7 @@
 #ifndef UNIT_TEST
 #include <driver/gpio.h>
 #include <esp_rom_gpio.h>
+#include <esp_attr.h>
 #endif
 
 #include <cstdio>
@@ -31,6 +32,12 @@
 
 namespace homedeck {
 namespace {
+
+#ifdef UNIT_TEST
+SystemView gRtcSavedView = SystemView::Almanac;
+#else
+RTC_DATA_ATTR SystemView gRtcSavedView = SystemView::Almanac;
+#endif
 
 #ifndef UNIT_TEST
 void i2cBusRecovery() {
@@ -180,7 +187,7 @@ ConfigValidationResult saveSubmittedConfig(
 std::string formatCurrentTimeHHMM() {
   time_t now = time(nullptr);
   tm* local = localtime(&now);
-  char timeStr[6] = {};
+  char timeStr[8] = {};
   if (local != nullptr) {
     snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
   }
@@ -353,17 +360,24 @@ BootControllerDeps makeBootDeps() {
   deps.millis = []() { return millis(); };
   deps.restart = []() { ESP.restart(); };
   deps.currentTime = []() { return time(nullptr); };
+  deps.loadSavedView = []() { return gRtcSavedView; };
+  deps.saveCurrentView = [](homedeck::SystemView view) { gRtcSavedView = view; };
   deps.preSleepRender = [](homedeck::SystemView view) {
     if (view == homedeck::SystemView::Almanac) {
-      HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment("--:--");
-      data.temperatureAvailable = false;
-      data.humidityAvailable = false;
+      HomeCalendarData data = makeCurrentHomeCalendarData();
+      data.bottomCenterMessage = "--:--";
       gHomeRenderer.render(data);
     } else {
-      CalendarData data = makeCurrentCalendarData();
+      std::time_t now = time(nullptr);
+      std::tm* local = localtime(&now);
+      std::tm fallback{};
+      if (local == nullptr) {
+        fallback.tm_year = 70;
+        fallback.tm_mday = 1;
+        local = &fallback;
+      }
+      CalendarData data = makeCalendarData(*local);
       data.bottomCenterMessage = "--:--";
-      data.temperatureAvailable = false;
-      data.humidityAvailable = false;
       gHomeRenderer.renderCalendar(data);
     }
   };

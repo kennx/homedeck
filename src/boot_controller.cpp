@@ -69,6 +69,9 @@ void BootController::update() {
   if (btnCClicks == 1) {
     if (viewManager_) {
       viewManager_->switchToNextView();
+      if (deps_.saveCurrentView) {
+        deps_.saveCurrentView(viewManager_->currentView());
+      }
       lastActivityMs_ = now;
     }
   } else if (btnCClicks >= 2) {
@@ -163,7 +166,9 @@ void BootController::enterSystemMode() {
   vmDeps.renderAlmanac = deps_.renderAlmanac;
   vmDeps.renderCalendar = deps_.renderCalendar;
   viewManager_ = std::make_unique<ViewManager>(std::move(vmDeps));
-  viewManager_->begin();
+  
+  SystemView initialView = deps_.loadSavedView ? deps_.loadSavedView() : SystemView::Almanac;
+  viewManager_->begin(initialView);
 
   lastActivityMs_ = deps_.millis ? deps_.millis() : 0;
 }

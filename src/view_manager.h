@@ -17,7 +17,7 @@ struct ViewManagerDeps {
 class ViewManager {
  public:
   explicit ViewManager(ViewManagerDeps deps);
-  void begin();
+  void begin(SystemView initialView = SystemView::Almanac);
   void switchToNextView();
   SystemView currentView() const;
 

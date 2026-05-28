@@ -91,31 +91,53 @@ envData.bottomCenterMessage = data.bottomCenterMessage;  // 新增
 drawEnvironmentReadings(canvas, envData);
 ```
 
-### 4. app_runtime preSleepRender 实现
+### 4. app_runtime 正常渲染路径改动
+
+#### 新增 `formatCurrentTimeHHMM()` 辅助函数
+
+```cpp
+std::string formatCurrentTimeHHMM() {
+  time_t now = time(nullptr);
+  tm* local = localtime(&now);
+  char timeStr[6] = {};
+  if (local != nullptr) {
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
+  }
+  return timeStr;
+}
+```
+
+#### 正常渲染函数统一设置 `bottomCenterMessage`
+
+所有活跃状态下的渲染函数（初始渲染、翻页、视图切换）都在底部中间显示当前 `HH:MM`：
+
+- `renderHomeWithEnvironment()` — 传入 `formatCurrentTimeHHMM()`
+- `renderCalendarWithEnvironment()` — 设置 `data.bottomCenterMessage = formatCurrentTimeHHMM()`
+- `renderCalendarWithOffset()` — 设置 `data.bottomCenterMessage = formatCurrentTimeHHMM()`
+- `renderAlmanacWithOffset()` — 设置 `data.bottomCenterMessage = formatCurrentTimeHHMM()`
+
+### 5. app_runtime preSleepRender 实现
 
 在 `makeBootDeps()` 中绑定 `preSleepRender` lambda：
 
 ```cpp
 deps.preSleepRender = [](SystemView view) {
-  // 格式化当前时间 HH:MM
-  time_t now = time(nullptr);
-  tm* local = localtime(&now);
-  char timeStr[6];
-  snprintf(timeStr, sizeof(timeStr), "%02d:%02d", local->tm_hour, local->tm_min);
-
   if (view == SystemView::Almanac) {
-    HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment();
-    data.bottomCenterMessage = timeStr;
+    HomeCalendarData data = makeCurrentHomeCalendarDataWithEnvironment("--:--");
+    data.temperatureAvailable = false;
+    data.humidityAvailable = false;
     gHomeRenderer.render(data);
   } else {
     CalendarData data = makeCurrentCalendarData();
-    data.bottomCenterMessage = timeStr;
+    data.bottomCenterMessage = "--:--";
+    data.temperatureAvailable = false;
+    data.humidityAvailable = false;
     gHomeRenderer.renderCalendar(data);
   }
 };
 ```
 
-### 5. enterHomeDeepSleep 简化
+### 6. enterHomeDeepSleep 简化
 
 移除 `renderHomeWithDeepSleepMessage()` 调用，不再负责渲染：
 
@@ -134,12 +156,12 @@ void enterHomeDeepSleep(const HomeSleepRequest& request) {
 
 ## 交互行为
 
-| 当前视图 | 进入 deep sleep 前显示 | 底部中间文字 | 唤醒后状态 |
-|---------|----------------------|------------|----------|
-| 黄历（本月） | 今天黄历 | `HH:MM` | 黄历（本月） |
-| 黄历（翻页后） | 今天黄历 | `HH:MM` | 黄历（本月，offset 已重置） |
-| 日历（本月） | 本月日历 | `HH:MM` | 日历（本月） |
-| 日历（翻页后） | 本月日历（offset 重置） | `HH:MM` | 日历（本月，offset 已重置） |
+| 当前视图 | 进入 deep sleep 前显示 | 底部（左/中/右） | 唤醒后状态 |
+|---------|----------------------|----------------|----------|
+| 黄历（本月） | 今天黄历 | `--.-°C` / `--:--` / `--.-%` | 黄历（本月），显示实际温湿度和 `HH:MM` |
+| 黄历（翻页后） | 今天黄历 | `--.-°C` / `--:--` / `--.-%` | 黄历（本月，offset 已重置），显示实际温湿度和 `HH:MM` |
+| 日历（本月） | 本月日历 | `--.-°C` / `--:--` / `--.-%` | 日历（本月），显示实际温湿度和 `HH:MM` |
+| 日历（翻页后） | 本月日历（offset 重置） | `--.-°C` / `--:--` / `--.-%` | 日历（本月，offset 已重置），显示实际温湿度和 `HH:MM` |
 
 ## 测试策略
 

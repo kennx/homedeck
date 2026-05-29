@@ -113,6 +113,40 @@ void test_calendar_data_reads_almanac_file_once_for_lookahead_scan() {
   TEST_ASSERT_EQUAL(1, LittleFS.endCount);
 }
 
+void test_calendar_data_retries_after_failed_almanac_lookup() {
+  std::tm local{};
+  local.tm_year = 1900 - 1900;
+  local.tm_mon = 0;
+  local.tm_mday = 1;
+  local.tm_wday = 1;
+
+  (void)homedeck::makeCalendarData(local);
+
+  fakeLittleFSSetFile("/almanac.bin", homedeck::test::buildSingleDayFixturePackage());
+  const auto data = homedeck::makeCalendarData(local);
+
+  TEST_ASSERT_EQUAL_STRING("腊月初一", data.lunarDate.c_str());
+  TEST_ASSERT_EQUAL(2, LittleFS.openCount);
+}
+
+void test_home_calendar_data_reuses_calendar_almanac_cache_for_same_day() {
+  fakeLittleFSSetFile("/almanac.bin", homedeck::test::buildSingleDayFixturePackage());
+
+  std::tm local{};
+  local.tm_year = 1900 - 1900;
+  local.tm_mon = 0;
+  local.tm_mday = 1;
+  local.tm_wday = 1;
+
+  (void)homedeck::makeCalendarData(local);
+  const int openCountAfterCalendar = LittleFS.openCount;
+
+  const auto data = homedeck::makeHomeCalendarData(local);
+
+  TEST_ASSERT_EQUAL_STRING("腊月初一", data.lunarDate.c_str());
+  TEST_ASSERT_EQUAL(openCountAfterCalendar, LittleFS.openCount);
+}
+
 void test_home_calendar_data_uses_placeholder_for_empty_almanac_actions() {
   auto day = homedeck::test::singleDayFixture();
   day.yi.clear();
@@ -160,6 +194,7 @@ void test_home_calendar_data_keeps_public_date_when_almanac_missing() {
 void setUp() {
   M5 = FakeM5Global{};
   fakeLittleFSReset();
+  homedeck::resetAlmanacCacheForTest();
   gLastQrCodeText.clear();
 }
 
@@ -602,6 +637,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_home_calendar_data_uses_almanac_package_when_available);
   RUN_TEST(test_calendar_data_reads_almanac_file_once_for_lookahead_scan);
+  RUN_TEST(test_calendar_data_retries_after_failed_almanac_lookup);
+  RUN_TEST(test_home_calendar_data_reuses_calendar_almanac_cache_for_same_day);
   RUN_TEST(test_home_calendar_data_uses_placeholder_for_empty_almanac_actions);
   RUN_TEST(test_home_calendar_data_keeps_public_date_when_almanac_missing);
   RUN_TEST(test_home_renderer_draws_lunar_calendar_portrait);

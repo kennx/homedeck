@@ -61,6 +61,10 @@ void applySht40ToCalendar(CalendarData& data);
 HomeCalendarData makeHomeCalendarData(const std::tm& localTime);
 HomeCalendarData makeCurrentHomeCalendarData();
 
+#ifdef UNIT_TEST
+void resetAlmanacCacheForTest();
+#endif
+
 class HomeRenderer {
  public:
   void render();

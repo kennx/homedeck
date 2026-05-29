@@ -483,36 +483,6 @@ void applyAlmanac(HomeCalendarData& data, const AlmanacDayData& almanac) {
   data.ji = almanac.ji.empty() ? "暂无" : almanac.ji;
 }
 
-}  // namespace
-
-HomeCalendarData makeHomeCalendarData(const std::tm& localTime) {
-  const int weekday = localTime.tm_wday;
-  HomeCalendarData data{};
-  data.year = formatYear(localTime.tm_year + 1900);
-  data.month = chineseMonthName(localTime.tm_mon);
-  data.day = formatDay(localTime.tm_mday);
-  data.weekday = weekdayName(weekday);
-  data.isHoliday = weekday == 0 || weekday == 6;
-
-  AlmanacProvider provider;
-  AlmanacDayData almanac{};
-  if (provider.lookup(localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, &almanac)) {
-    applyAlmanac(data, almanac);
-  } else {
-    applyMissingAlmanac(data);
-  }
-
-  return data;
-}
-
-HomeCalendarData makeCurrentHomeCalendarData() {
-  const std::time_t now = std::time(nullptr);
-  const std::tm* local = now > 0 ? std::localtime(&now) : nullptr;
-  return makeHomeCalendarData(local != nullptr ? *local : fallbackLocalTime());
-}
-
-namespace {
-
 std::string lookupLunarFestival(const std::string& lunarDate) {
   static const std::unordered_map<std::string, std::string> kFestivals = {
       {"正月初一", "春节"},
@@ -530,10 +500,28 @@ std::string lookupLunarFestival(const std::string& lunarDate) {
   return (it != kFestivals.end()) ? it->second : "";
 }
 
-struct AlmanacCache {
-  int year = 0;
-  int month = 0;
-  int day = 0;
+void setAlmanacCacheString(char* dest, std::size_t size, const std::string& src) {
+  const std::size_t len = std::min(size - 1, src.size());
+  std::memcpy(dest, src.c_str(), len);
+  dest[len] = '\0';
+}
+
+struct AlmanacHomeCache {
+  bool valid = false;
+  char lunarDate[32];
+  char solarTerm[32];
+  char ganzhi[96];
+  char wuxing[48];
+  char chongsha[48];
+  char zhishen[48];
+  char jianchu[48];
+  char taishen[64];
+  char yi[512];
+  char ji[512];
+};
+
+struct AlmanacCalendarCache {
+  bool valid = false;
   char lunarDate[32];
   char solarTerm[32];
   char festival[32];
@@ -547,11 +535,13 @@ struct AlmanacCache {
   char secondSpecialFestival[32];
 };
 
-void setAlmanacCacheString(char* dest, std::size_t size, const std::string& src) {
-  const std::size_t len = std::min(size - 1, src.size());
-  std::memcpy(dest, src.c_str(), len);
-  dest[len] = '\0';
-}
+struct AlmanacCache {
+  int year = 0;
+  int month = 0;
+  int day = 0;
+  AlmanacHomeCache home;
+  AlmanacCalendarCache calendar;
+};
 
 #ifdef UNIT_TEST
 AlmanacCache gAlmanacCache;
@@ -559,7 +549,93 @@ AlmanacCache gAlmanacCache;
 RTC_DATA_ATTR AlmanacCache gAlmanacCache;
 #endif
 
+bool almanacCacheMatches(int year, int month, int day) {
+  return gAlmanacCache.year == year && gAlmanacCache.month == month && gAlmanacCache.day == day;
+}
+
+void prepareAlmanacCacheDate(int year, int month, int day) {
+  if (almanacCacheMatches(year, month, day)) {
+    return;
+  }
+  gAlmanacCache = AlmanacCache{};
+  gAlmanacCache.year = year;
+  gAlmanacCache.month = month;
+  gAlmanacCache.day = day;
+}
+
+void writeHomeAlmanacCache(int year, int month, int day, const AlmanacDayData& almanac) {
+  prepareAlmanacCacheDate(year, month, day);
+  gAlmanacCache.home.valid = true;
+  setAlmanacCacheString(gAlmanacCache.home.lunarDate, sizeof(gAlmanacCache.home.lunarDate), almanac.lunarDate);
+  setAlmanacCacheString(gAlmanacCache.home.solarTerm, sizeof(gAlmanacCache.home.solarTerm), almanac.solarTerm);
+  setAlmanacCacheString(gAlmanacCache.home.ganzhi, sizeof(gAlmanacCache.home.ganzhi), almanac.ganzhi);
+  setAlmanacCacheString(gAlmanacCache.home.wuxing, sizeof(gAlmanacCache.home.wuxing), almanac.wuxing);
+  setAlmanacCacheString(gAlmanacCache.home.chongsha, sizeof(gAlmanacCache.home.chongsha), almanac.chongsha);
+  setAlmanacCacheString(gAlmanacCache.home.zhishen, sizeof(gAlmanacCache.home.zhishen), almanac.zhishen);
+  setAlmanacCacheString(gAlmanacCache.home.jianchu, sizeof(gAlmanacCache.home.jianchu), almanac.jianchu);
+  setAlmanacCacheString(gAlmanacCache.home.taishen, sizeof(gAlmanacCache.home.taishen), almanac.taishen);
+  setAlmanacCacheString(gAlmanacCache.home.yi, sizeof(gAlmanacCache.home.yi), almanac.yi.empty() ? "暂无" : almanac.yi);
+  setAlmanacCacheString(gAlmanacCache.home.ji, sizeof(gAlmanacCache.home.ji), almanac.ji.empty() ? "暂无" : almanac.ji);
+}
+
+bool applyCachedHomeAlmanac(int year, int month, int day, HomeCalendarData& data) {
+  if (!almanacCacheMatches(year, month, day) || !gAlmanacCache.home.valid) {
+    return false;
+  }
+  data.lunarDate = gAlmanacCache.home.lunarDate;
+  data.solarTerm = gAlmanacCache.home.solarTerm;
+  data.ganzhi = gAlmanacCache.home.ganzhi;
+  data.wuxing = gAlmanacCache.home.wuxing;
+  data.chongsha = gAlmanacCache.home.chongsha;
+  data.zhishen = gAlmanacCache.home.zhishen;
+  data.jianchu = gAlmanacCache.home.jianchu;
+  data.taishen = gAlmanacCache.home.taishen;
+  data.yi = gAlmanacCache.home.yi;
+  data.ji = gAlmanacCache.home.ji;
+  return true;
+}
+
 }  // namespace
+
+HomeCalendarData makeHomeCalendarData(const std::tm& localTime) {
+  const int year = localTime.tm_year + 1900;
+  const int month = localTime.tm_mon + 1;
+  const int day = localTime.tm_mday;
+  const int weekday = localTime.tm_wday;
+  HomeCalendarData data{};
+  data.year = formatYear(year);
+  data.month = chineseMonthName(localTime.tm_mon);
+  data.day = formatDay(day);
+  data.weekday = weekdayName(weekday);
+  data.isHoliday = weekday == 0 || weekday == 6;
+
+  if (applyCachedHomeAlmanac(year, month, day, data)) {
+    return data;
+  }
+
+  AlmanacProvider provider;
+  AlmanacDayData almanac{};
+  if (provider.lookup(year, month, day, &almanac)) {
+    applyAlmanac(data, almanac);
+    writeHomeAlmanacCache(year, month, day, almanac);
+  } else {
+    applyMissingAlmanac(data);
+  }
+
+  return data;
+}
+
+HomeCalendarData makeCurrentHomeCalendarData() {
+  const std::time_t now = std::time(nullptr);
+  const std::tm* local = now > 0 ? std::localtime(&now) : nullptr;
+  return makeHomeCalendarData(local != nullptr ? *local : fallbackLocalTime());
+}
+
+#ifdef UNIT_TEST
+void resetAlmanacCacheForTest() {
+  gAlmanacCache = AlmanacCache{};
+}
+#endif
 
 CalendarData makeCalendarData(const std::tm& localTime) {
   CalendarData data{};
@@ -572,18 +648,18 @@ CalendarData makeCalendarData(const std::tm& localTime) {
 
   // 缓存命中：同一天直接复用，避免重复 Almanac 查询
   if (gAlmanacCache.year == data.year && gAlmanacCache.month == data.month &&
-      gAlmanacCache.day == data.day) {
-    data.lunarDate = gAlmanacCache.lunarDate;
-    data.solarTerm = gAlmanacCache.solarTerm;
-    data.festival = gAlmanacCache.festival;
-    data.nextSpecialMonth = gAlmanacCache.nextSpecialMonth;
-    data.nextSpecialDay = gAlmanacCache.nextSpecialDay;
-    data.nextSpecialTerm = gAlmanacCache.nextSpecialTerm;
-    data.nextSpecialFestival = gAlmanacCache.nextSpecialFestival;
-    data.secondSpecialMonth = gAlmanacCache.secondSpecialMonth;
-    data.secondSpecialDay = gAlmanacCache.secondSpecialDay;
-    data.secondSpecialTerm = gAlmanacCache.secondSpecialTerm;
-    data.secondSpecialFestival = gAlmanacCache.secondSpecialFestival;
+      gAlmanacCache.day == data.day && gAlmanacCache.calendar.valid) {
+    data.lunarDate = gAlmanacCache.calendar.lunarDate;
+    data.solarTerm = gAlmanacCache.calendar.solarTerm;
+    data.festival = gAlmanacCache.calendar.festival;
+    data.nextSpecialMonth = gAlmanacCache.calendar.nextSpecialMonth;
+    data.nextSpecialDay = gAlmanacCache.calendar.nextSpecialDay;
+    data.nextSpecialTerm = gAlmanacCache.calendar.nextSpecialTerm;
+    data.nextSpecialFestival = gAlmanacCache.calendar.nextSpecialFestival;
+    data.secondSpecialMonth = gAlmanacCache.calendar.secondSpecialMonth;
+    data.secondSpecialDay = gAlmanacCache.calendar.secondSpecialDay;
+    data.secondSpecialTerm = gAlmanacCache.calendar.secondSpecialTerm;
+    data.secondSpecialFestival = gAlmanacCache.calendar.secondSpecialFestival;
     return data;
   }
 
@@ -601,11 +677,14 @@ CalendarData makeCalendarData(const std::tm& localTime) {
   }
 
   bool foundFirst = false;
-  provider.lookupEach(dates.data(), dates.size(), [&](const AlmanacLookupDate& date, const AlmanacDayData& almanac) {
+  bool foundToday = false;
+  const bool foundAny = provider.lookupEach(dates.data(), dates.size(), [&](const AlmanacLookupDate& date, const AlmanacDayData& almanac) {
     if (date.year == data.year && date.month == data.month && date.day == data.day) {
+      foundToday = true;
       data.lunarDate = almanac.lunarDate;
       data.solarTerm = almanac.solarTerm;
       data.festival = lookupLunarFestival(almanac.lunarDate);
+      writeHomeAlmanacCache(data.year, data.month, data.day, almanac);
       return false;
     }
 
@@ -628,21 +707,33 @@ CalendarData makeCalendarData(const std::tm& localTime) {
     return false;
   });
 
+  if (!foundAny || !foundToday) {
+    return data;
+  }
+
   // 写入缓存
-  gAlmanacCache.year = data.year;
-  gAlmanacCache.month = data.month;
-  gAlmanacCache.day = data.day;
-  setAlmanacCacheString(gAlmanacCache.lunarDate, sizeof(gAlmanacCache.lunarDate), data.lunarDate);
-  setAlmanacCacheString(gAlmanacCache.solarTerm, sizeof(gAlmanacCache.solarTerm), data.solarTerm);
-  setAlmanacCacheString(gAlmanacCache.festival, sizeof(gAlmanacCache.festival), data.festival);
-  gAlmanacCache.nextSpecialMonth = data.nextSpecialMonth;
-  gAlmanacCache.nextSpecialDay = data.nextSpecialDay;
-  setAlmanacCacheString(gAlmanacCache.nextSpecialTerm, sizeof(gAlmanacCache.nextSpecialTerm), data.nextSpecialTerm);
-  setAlmanacCacheString(gAlmanacCache.nextSpecialFestival, sizeof(gAlmanacCache.nextSpecialFestival), data.nextSpecialFestival);
-  gAlmanacCache.secondSpecialMonth = data.secondSpecialMonth;
-  gAlmanacCache.secondSpecialDay = data.secondSpecialDay;
-  setAlmanacCacheString(gAlmanacCache.secondSpecialTerm, sizeof(gAlmanacCache.secondSpecialTerm), data.secondSpecialTerm);
-  setAlmanacCacheString(gAlmanacCache.secondSpecialFestival, sizeof(gAlmanacCache.secondSpecialFestival), data.secondSpecialFestival);
+  prepareAlmanacCacheDate(data.year, data.month, data.day);
+  gAlmanacCache.calendar.valid = true;
+  setAlmanacCacheString(gAlmanacCache.calendar.lunarDate, sizeof(gAlmanacCache.calendar.lunarDate), data.lunarDate);
+  setAlmanacCacheString(gAlmanacCache.calendar.solarTerm, sizeof(gAlmanacCache.calendar.solarTerm), data.solarTerm);
+  setAlmanacCacheString(gAlmanacCache.calendar.festival, sizeof(gAlmanacCache.calendar.festival), data.festival);
+  gAlmanacCache.calendar.nextSpecialMonth = data.nextSpecialMonth;
+  gAlmanacCache.calendar.nextSpecialDay = data.nextSpecialDay;
+  setAlmanacCacheString(gAlmanacCache.calendar.nextSpecialTerm, sizeof(gAlmanacCache.calendar.nextSpecialTerm), data.nextSpecialTerm);
+  setAlmanacCacheString(
+      gAlmanacCache.calendar.nextSpecialFestival,
+      sizeof(gAlmanacCache.calendar.nextSpecialFestival),
+      data.nextSpecialFestival);
+  gAlmanacCache.calendar.secondSpecialMonth = data.secondSpecialMonth;
+  gAlmanacCache.calendar.secondSpecialDay = data.secondSpecialDay;
+  setAlmanacCacheString(
+      gAlmanacCache.calendar.secondSpecialTerm,
+      sizeof(gAlmanacCache.calendar.secondSpecialTerm),
+      data.secondSpecialTerm);
+  setAlmanacCacheString(
+      gAlmanacCache.calendar.secondSpecialFestival,
+      sizeof(gAlmanacCache.calendar.secondSpecialFestival),
+      data.secondSpecialFestival);
 
   return data;
 }

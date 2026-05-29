@@ -511,6 +511,8 @@ HomeCalendarData makeCurrentHomeCalendarData() {
   return makeHomeCalendarData(local != nullptr ? *local : fallbackLocalTime());
 }
 
+namespace {
+
 std::string lookupLunarFestival(const std::string& lunarDate) {
   static const std::unordered_map<std::string, std::string> kFestivals = {
       {"正月初一", "春节"},
@@ -527,8 +529,6 @@ std::string lookupLunarFestival(const std::string& lunarDate) {
   auto it = kFestivals.find(lunarDate);
   return (it != kFestivals.end()) ? it->second : "";
 }
-
-namespace {
 
 struct AlmanacCache {
   int year = 0;
@@ -904,7 +904,7 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
   const int lastRowBottomY = kCalDateStartY + actualRows * kCalDateRowHeight;
   const int sepY = lastRowBottomY + 12;
   const int sepLeftX = 12;
-  const int sepRightX = M5.Display.width() - 12;
+  const int sepRightX = canvas.width() - 12;
   canvas.drawFastHLine(sepLeftX, sepY, sepRightX - sepLeftX, TFT_BLACK);
 
   // 分割线下方：公历 + 农历 + 节日（左），节气（右）
@@ -933,7 +933,7 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
       std::string nextLine = std::to_string(data.nextSpecialMonth) + "月" +
                              std::to_string(data.nextSpecialDay) + "日";
       if (!data.nextSpecialTerm.empty()) {
-        nextLine += data.nextSpecialTerm;
+        nextLine += " " + data.nextSpecialTerm;
       }
       if (!data.nextSpecialFestival.empty()) {
         if (!data.nextSpecialTerm.empty()) {
@@ -942,7 +942,7 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
         nextLine += data.nextSpecialFestival;
       }
       canvas.setTextDatum(textdatum_t::top_left);
-      canvas.drawString(nextLine.c_str(), sepLeftX, infoY + 22);
+      canvas.drawString(nextLine.c_str(), sepLeftX, infoY + 34);
     }
 
     // 第三行：下下一个节气或节日
@@ -950,7 +950,7 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
       std::string secondLine = std::to_string(data.secondSpecialMonth) + "月" +
                                std::to_string(data.secondSpecialDay) + "日";
       if (!data.secondSpecialTerm.empty()) {
-        secondLine += data.secondSpecialTerm;
+        secondLine += " " + data.secondSpecialTerm;
       }
       if (!data.secondSpecialFestival.empty()) {
         if (!data.secondSpecialTerm.empty()) {
@@ -959,8 +959,9 @@ void HomeRenderer::renderCalendar(const CalendarData& data) {
         secondLine += data.secondSpecialFestival;
       }
       canvas.setTextDatum(textdatum_t::top_left);
-      canvas.drawString(secondLine.c_str(), sepLeftX, infoY + 44);
+      canvas.drawString(secondLine.c_str(), sepLeftX, infoY + 68);
     }
+    canvas.unloadFont();
   }
 
   // 底部温湿度

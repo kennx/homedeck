@@ -368,7 +368,7 @@ void test_double_click_resets_to_today_in_calendar() {
   TEST_ASSERT_EQUAL(0, f.calendarOffsets[0]);
 }
 
-void test_double_click_ignored_in_almanac() {
+void test_double_click_in_almanac_does_not_affect_calendar_offsets() {
   Fixture f{};
   f.configured = true;
   homedeck::BootController controller{f.deps()};
@@ -814,7 +814,7 @@ int main(int, char**) {
   RUN_TEST(test_config_mode_update_handles_portal_client);
   RUN_TEST(test_single_click_switches_view);
   RUN_TEST(test_double_click_resets_to_today_in_calendar);
-  RUN_TEST(test_double_click_ignored_in_almanac);
+  RUN_TEST(test_double_click_in_almanac_does_not_affect_calendar_offsets);
   RUN_TEST(test_prev_month_click_in_calendar);
   RUN_TEST(test_next_month_click_in_calendar);
   RUN_TEST(test_offsets_reset_before_deep_sleep);

@@ -12,6 +12,35 @@ namespace {
 
 constexpr int kThemeColor = TFT_BLACK;
 constexpr int kBgColor = TFT_WHITE;
+constexpr int kHeaderTopY = 12;
+constexpr int kCenterX = 200;
+constexpr int kInsetX = 12;
+constexpr int kRightX = 388;
+
+const char* chineseMonthName(int monthIndex) {
+  static constexpr const char* kMonths[] = {
+      "一月", "二月", "三月", "四月", "五月", "六月",
+      "七月", "八月", "九月", "十月", "十一月", "十二月"};
+  if (monthIndex < 0 || monthIndex >= 12) {
+    return kMonths[0];
+  }
+  return kMonths[monthIndex];
+}
+
+const char* weekdayName(int weekdayIndex) {
+  static constexpr const char* kWeekdays[] = {
+      "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
+  if (weekdayIndex < 0 || weekdayIndex >= 7) {
+    return kWeekdays[0];
+  }
+  return kWeekdays[weekdayIndex];
+}
+
+std::string formatYear(int year) {
+  char buffer[16] = {};
+  std::snprintf(buffer, sizeof(buffer), "%d 年", year);
+  return buffer;
+}
 
 int daysBetween(const std::tm& start, const std::tm& end) {
   std::tm s = start;
@@ -31,6 +60,8 @@ CountdownData makeCountdownData(const std::tm& localTime) {
   CountdownData data{};
   data.currentYear = localTime.tm_year + 1900;
   data.nextYear = data.currentYear + 1;
+  data.month = localTime.tm_mon + 1;
+  data.weekday = localTime.tm_wday;
 
   std::tm startOfDay = localTime;
   startOfDay.tm_hour = 0;
@@ -81,6 +112,20 @@ void CountdownView::render() {
 void CountdownView::render(const CountdownData& data) {
   M5Canvas& canvas = sprite();
   prepareScreen(canvas);
+
+  // 顶部状态栏：年 / 月份 / 星期几
+  if (canvas.loadFont(generated::kDeviceFontVlw)) {
+    canvas.setTextColor(kThemeColor, kBgColor);
+    canvas.setTextDatum(textdatum_t::top_left);
+    canvas.drawString(formatYear(data.currentYear).c_str(), kInsetX, kHeaderTopY);
+
+    canvas.setTextDatum(textdatum_t::top_center);
+    canvas.drawString(chineseMonthName(data.month - 1), kCenterX, kHeaderTopY);
+
+    canvas.setTextDatum(textdatum_t::top_right);
+    canvas.drawString(weekdayName(data.weekday), kRightX, kHeaderTopY);
+    canvas.unloadFont();
+  }
 
   const int centerX = canvas.width() / 2;
   const int centerY = canvas.height() / 2;

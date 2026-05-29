@@ -580,22 +580,34 @@ void test_calendar_renders_past_month_correctly() {
   data.year = 2026;
   data.month = 4;
   data.day = 26;
+  data.todayWeekday = 0;  // 星期日
 
   homedeck::HomeRenderer renderer;
   renderer.renderCalendar(data);
 
   bool foundYear = false;
   bool foundMonth = false;
+  bool foundWeekday = false;
   for (const auto& print : M5.Display.prints) {
     if (print.text == "2026 年") {
+      TEST_ASSERT_EQUAL(12, print.x);
+      TEST_ASSERT_EQUAL(12, print.y);
       foundYear = true;
     }
     if (print.text == "四月") {
+      TEST_ASSERT_EQUAL(200, print.x);
+      TEST_ASSERT_EQUAL(12, print.y);
       foundMonth = true;
+    }
+    if (print.text == "星期日") {
+      TEST_ASSERT_EQUAL(388, print.x);
+      TEST_ASSERT_EQUAL(12, print.y);
+      foundWeekday = true;
     }
   }
   TEST_ASSERT_TRUE(foundYear);
   TEST_ASSERT_TRUE(foundMonth);
+  TEST_ASSERT_TRUE(foundWeekday);
 }
 
 void test_calendar_draws_bottom_center_message_when_present() {

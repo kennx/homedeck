@@ -17,6 +17,8 @@ void test_countdown_jan_first_has_full_year_days() {
   CountdownData data = makeCountdownData(tm);
   TEST_ASSERT_EQUAL(2026, data.currentYear);
   TEST_ASSERT_EQUAL(2027, data.nextYear);
+  TEST_ASSERT_EQUAL(1, data.month);
+  TEST_ASSERT_EQUAL(0, data.weekday);  // tm{} zero-initializes wday to 0
   TEST_ASSERT_EQUAL(365, data.daysRemaining);  // 2026 is not a leap year
 }
 
@@ -31,6 +33,8 @@ void test_countdown_dec_31_has_one_day() {
   tm.tm_isdst = -1;
 
   CountdownData data = makeCountdownData(tm);
+  TEST_ASSERT_EQUAL(12, data.month);
+  TEST_ASSERT_EQUAL(0, data.weekday);
   TEST_ASSERT_EQUAL(1, data.daysRemaining);
 }
 
@@ -45,6 +49,8 @@ void test_countdown_leap_year_has_366_days_on_jan_first() {
   tm.tm_isdst = -1;
 
   CountdownData data = makeCountdownData(tm);
+  TEST_ASSERT_EQUAL(1, data.month);
+  TEST_ASSERT_EQUAL(0, data.weekday);
   TEST_ASSERT_EQUAL(366, data.daysRemaining);
 }
 
@@ -59,6 +65,8 @@ void test_countdown_may_29_2026() {
   tm.tm_isdst = -1;
 
   CountdownData data = makeCountdownData(tm);
+  TEST_ASSERT_EQUAL(5, data.month);
+  TEST_ASSERT_EQUAL(0, data.weekday);
   // May 29 -> Jan 1 next year = 217 days
   // May 29->31 = 2, Jun = 30 (32), Jul = 31 (63), Aug = 31 (94),
   // Sep = 30 (124), Oct = 31 (155), Nov = 30 (185), Dec = 31 (216),
@@ -94,6 +102,8 @@ void test_countdown_negative_is_clamped_to_zero() {
   CountdownData data = makeCountdownData(tm);
   TEST_ASSERT_EQUAL(2027, data.currentYear);
   TEST_ASSERT_EQUAL(2028, data.nextYear);
+  TEST_ASSERT_EQUAL(1, data.month);
+  TEST_ASSERT_EQUAL(0, data.weekday);
   TEST_ASSERT_TRUE(data.daysRemaining > 0);
 }
 

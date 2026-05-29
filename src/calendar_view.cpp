@@ -128,8 +128,11 @@ void CalendarView::render(const CalendarData& data) {
     canvas.setTextDatum(textdatum_t::top_left);
     canvas.drawString(formatCalendarYear(data.year).c_str(), kCalInsetX, kCalHeaderTopY);
 
+    canvas.setTextDatum(textdatum_t::top_center);
+    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalCenterX, kCalHeaderTopY);
+
     canvas.setTextDatum(textdatum_t::top_right);
-    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalRightX, kCalHeaderTopY);
+    canvas.drawString(formatCalendarWeekday(data.todayWeekday).c_str(), kCalRightX, kCalHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::middle_center);
     for (int col = 0; col < kCalColCount; ++col) {

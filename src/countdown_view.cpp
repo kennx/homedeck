@@ -7,6 +7,7 @@
 #include "generated/device_font_vlw.h"
 #include "render_context.h"
 #include "sht40_reader.h"
+#include "view_common.h"
 
 namespace homedeck {
 
@@ -14,69 +15,6 @@ namespace {
 
 constexpr int kThemeColor = TFT_BLACK;
 constexpr int kBgColor = TFT_WHITE;
-constexpr int kHeaderTopY = 12;
-constexpr int kCenterX = 200;
-constexpr int kInsetX = 12;
-constexpr int kRightX = 388;
-constexpr int kBottomInset = 12;
-
-const char* chineseMonthName(int monthIndex) {
-  static constexpr const char* kMonths[] = {
-      "一月", "二月", "三月", "四月", "五月", "六月",
-      "七月", "八月", "九月", "十月", "十一月", "十二月"};
-  if (monthIndex < 0 || monthIndex >= 12) {
-    return kMonths[0];
-  }
-  return kMonths[monthIndex];
-}
-
-const char* weekdayName(int weekdayIndex) {
-  static constexpr const char* kWeekdays[] = {
-      "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
-  if (weekdayIndex < 0 || weekdayIndex >= 7) {
-    return kWeekdays[0];
-  }
-  return kWeekdays[weekdayIndex];
-}
-
-std::string formatYear(int year) {
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%d 年", year);
-  return buffer;
-}
-
-std::string formatTemperatureText(bool available, float celsius) {
-  if (!available) {
-    return "--.-°C";
-  }
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%.1f°C", celsius);
-  return buffer;
-}
-
-std::string formatHumidityText(bool available, float percent) {
-  if (!available) {
-    return "--.-%";
-  }
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%.1f%%", percent);
-  return buffer;
-}
-
-void drawEnvironmentReadings(M5Canvas& canvas, const CountdownData& data) {
-  const int bottomY = canvas.height() - kBottomInset;
-
-  canvas.setTextDatum(textdatum_t::bottom_left);
-  canvas.drawString(formatTemperatureText(data.temperatureAvailable, data.temperatureCelsius).c_str(), kInsetX, bottomY);
-
-  if (!data.bottomCenterMessage.empty()) {
-    canvas.setTextDatum(textdatum_t::bottom_center);
-    canvas.drawString(data.bottomCenterMessage.c_str(), kCenterX, bottomY);
-  }
-
-  canvas.setTextDatum(textdatum_t::bottom_right);
-  canvas.drawString(formatHumidityText(data.humidityAvailable, data.humidityPercent).c_str(), kRightX, bottomY);
-}
 
 int daysBetween(const std::tm& start, const std::tm& end) {
   std::tm s = start;
@@ -163,13 +101,13 @@ void CountdownView::render(const CountdownData& data) {
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(kThemeColor, kBgColor);
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.drawString(formatYear(data.currentYear).c_str(), kInsetX, kHeaderTopY);
+    canvas.drawString(formatYear(data.currentYear).c_str(), kViewInsetX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(chineseMonthName(data.month - 1), kCenterX, kHeaderTopY);
+    canvas.drawString(chineseMonthName(data.month - 1), kViewCenterX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_right);
-    canvas.drawString(weekdayName(data.weekday), kRightX, kHeaderTopY);
+    canvas.drawString(weekdayName(data.weekday), kViewRightX, kViewHeaderTopY);
     canvas.unloadFont();
   }
 
@@ -210,7 +148,9 @@ void CountdownView::render(const CountdownData& data) {
   // 底部状态栏：温度 / 时间 / 湿度
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(kThemeColor, kBgColor);
-    drawEnvironmentReadings(canvas, data);
+    drawBottomStatusBar(canvas, {data.temperatureAvailable, data.temperatureCelsius,
+                                 data.humidityAvailable, data.humidityPercent,
+                                 data.bottomCenterMessage});
     canvas.unloadFont();
   }
 

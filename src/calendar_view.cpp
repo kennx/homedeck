@@ -10,15 +10,12 @@
 #include "generated/device_font_vlw.h"
 #include "render_context.h"
 #include "sht40_reader.h"
+#include "view_common.h"
 
 namespace homedeck {
 namespace {
 
-constexpr int kCalInsetX = 12;
-constexpr int kCalRightX = 388;
 constexpr int kCalWidth = 376;
-constexpr int kCalCenterX = 200;
-constexpr int kCalHeaderTopY = 12;
 constexpr int kCalHeaderHeight = 27;
 constexpr int kCalWeekdayTopY = 51;
 constexpr int kCalWeekdayHeight = 47;
@@ -34,27 +31,6 @@ const char* calendarWeekdayLabel(int index) {
   return kLabels[index];
 }
 
-std::string formatCalendarYear(int year) {
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%d 年", year);
-  return buffer;
-}
-
-std::string formatCalendarMonth(int month) {
-  static constexpr const char* kNames[] = {
-      "一月", "二月", "三月", "四月", "五月", "六月",
-      "七月", "八月", "九月", "十月", "十一月", "十二月"};
-  if (month < 1 || month > 12) return "";
-  return kNames[month - 1];
-}
-
-std::string formatCalendarWeekday(int wday) {
-  static constexpr const char* kNames[] = {
-      "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
-  if (wday < 0 || wday >= 7) return "";
-  return kNames[wday];
-}
-
 int daysInMonth(int year, int month) {
   static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
   if (month < 1 || month > 12) return 31;
@@ -66,56 +42,15 @@ int daysInMonth(int year, int month) {
 }
 
 int cellLeftX(int col) {
-  return kCalInsetX + col * kCalWidth / kCalColCount;
+  return kViewInsetX + col * kCalWidth / kCalColCount;
 }
 
 int cellRightX(int col) {
-  return kCalInsetX + (col + 1) * kCalWidth / kCalColCount;
+  return kViewInsetX + (col + 1) * kCalWidth / kCalColCount;
 }
 
 int cellCenterX(int col) {
   return (cellLeftX(col) + cellRightX(col)) / 2;
-}
-
-std::tm fallbackLocalTime() {
-  std::tm local{};
-  local.tm_year = 1970 - 1900;
-  local.tm_mon = 0;
-  local.tm_mday = 1;
-  local.tm_wday = 4;
-  return local;
-}
-
-void drawCalendarEnvironmentReadings(M5Canvas& canvas, const CalendarData& data) {
-  constexpr int kBottomInset = 12;
-  constexpr int kLeftX = 12;
-  constexpr int kRightX = 388;
-  constexpr int kCenterX = 200;
-  const int bottomY = canvas.height() - kBottomInset;
-
-  auto formatTemp = [](bool available, float celsius) -> std::string {
-    if (!available) return "--.-°C";
-    char buffer[16] = {};
-    std::snprintf(buffer, sizeof(buffer), "%.1f°C", celsius);
-    return buffer;
-  };
-  auto formatHum = [](bool available, float percent) -> std::string {
-    if (!available) return "--.-%";
-    char buffer[16] = {};
-    std::snprintf(buffer, sizeof(buffer), "%.1f%%", percent);
-    return buffer;
-  };
-
-  canvas.setTextDatum(textdatum_t::bottom_left);
-  canvas.drawString(formatTemp(data.temperatureAvailable, data.temperatureCelsius).c_str(), kLeftX, bottomY);
-
-  if (!data.bottomCenterMessage.empty()) {
-    canvas.setTextDatum(textdatum_t::bottom_center);
-    canvas.drawString(data.bottomCenterMessage.c_str(), kCenterX, bottomY);
-  }
-
-  canvas.setTextDatum(textdatum_t::bottom_right);
-  canvas.drawString(formatHum(data.humidityAvailable, data.humidityPercent).c_str(), kRightX, bottomY);
 }
 
 }  // namespace
@@ -126,13 +61,13 @@ void CalendarView::render(const CalendarData& data) {
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(TFT_BLACK, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.drawString(formatCalendarYear(data.year).c_str(), kCalInsetX, kCalHeaderTopY);
+    canvas.drawString(formatYear(data.year).c_str(), kViewInsetX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(formatCalendarMonth(data.month).c_str(), kCalCenterX, kCalHeaderTopY);
+    canvas.drawString(chineseMonthName(data.month - 1), kViewCenterX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_right);
-    canvas.drawString(formatCalendarWeekday(data.todayWeekday).c_str(), kCalRightX, kCalHeaderTopY);
+    canvas.drawString(weekdayName(data.todayWeekday), kViewRightX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::middle_center);
     for (int col = 0; col < kCalColCount; ++col) {
@@ -241,7 +176,9 @@ void CalendarView::render(const CalendarData& data) {
 
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(TFT_BLACK, TFT_WHITE);
-    drawCalendarEnvironmentReadings(canvas, data);
+    drawBottomStatusBar(canvas, {data.temperatureAvailable, data.temperatureCelsius,
+                                 data.humidityAvailable, data.humidityPercent,
+                                 data.bottomCenterMessage});
     canvas.unloadFont();
   }
 

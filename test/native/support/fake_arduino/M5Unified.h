@@ -32,7 +32,7 @@ enum class FakeFontKind {
   kDeviceDefault = 2,
   kDeviceMetric = 3,
   kConfigPortal = 4,
-  kDeviceLargeDate = 6,
+  kDeviceLargeDate = 5,
 };
 
 namespace m5 {

@@ -107,6 +107,19 @@ void test_countdown_negative_is_clamped_to_zero() {
   TEST_ASSERT_TRUE(data.daysRemaining > 0);
 }
 
+void test_countdown_weekday_via_mktime() {
+  std::tm tm{};
+  tm.tm_year = 126;  // 2026
+  tm.tm_mon = 4;     // May
+  tm.tm_mday = 29;
+  tm.tm_isdst = -1;
+  std::mktime(&tm);  // 正规化，填充 tm_wday
+
+  CountdownData data = makeCountdownData(tm);
+  TEST_ASSERT_EQUAL(5, data.month);
+  TEST_ASSERT_EQUAL(5, data.weekday);  // 2026-05-29 是星期五
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_countdown_jan_first_has_full_year_days);
@@ -114,5 +127,6 @@ int main(int, char**) {
   RUN_TEST(test_countdown_leap_year_has_366_days_on_jan_first);
   RUN_TEST(test_countdown_may_29_2026);
   RUN_TEST(test_countdown_negative_is_clamped_to_zero);
+  RUN_TEST(test_countdown_weekday_via_mktime);
   return UNITY_END();
 }

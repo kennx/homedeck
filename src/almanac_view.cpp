@@ -13,14 +13,11 @@
 #include "generated/device_font_vlw.h"
 #include "render_context.h"
 #include "sht40_reader.h"
+#include "view_common.h"
 
 namespace homedeck {
 namespace {
 
-constexpr int kCalendarInsetX = 12;
-constexpr int kCalendarRightX = 388;
-constexpr int kCalendarCenterX = 200;
-constexpr int kCalendarHeaderTopY = 12;
 constexpr int kCalendarDayTopY = 39;
 constexpr int kCalendarLunarTopY = 227;
 constexpr int kCalendarGanzhiTopY = 254;
@@ -37,9 +34,6 @@ constexpr int kTableRow1TextY = 303;
 constexpr int kTableRow2TextY = 350;
 constexpr int kTableYiTextY = 397;
 constexpr int kTableLineHeight = 27;
-constexpr int kEnvironmentTextBottomInset = 12;
-constexpr int kEnvironmentTextLeftX = 12;
-constexpr int kEnvironmentTextRightX = 388;
 constexpr int kTableRowPaddingY = 10;
 constexpr int kTableFixedRowHeight = 47;
 constexpr int kMaxActionLines = 2;
@@ -47,39 +41,6 @@ constexpr int kMaxActionLines = 2;
 constexpr std::uint16_t kGreenColor = 0x0449;
 constexpr std::uint16_t kRedColor = 0xF800;
 
-std::string formatTemperatureText(const HomeCalendarData& data) {
-  if (!data.temperatureAvailable) {
-    return "--.-°C";
-  }
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%.1f°C", data.temperatureCelsius);
-  return buffer;
-}
-
-std::string formatHumidityText(const HomeCalendarData& data) {
-  if (!data.humidityAvailable) {
-    return "--.-%";
-  }
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%.1f%%", data.humidityPercent);
-  return buffer;
-}
-
-void drawEnvironmentReadings(M5Canvas& canvas, const HomeCalendarData& data) {
-  const int bottomY = canvas.height() - kEnvironmentTextBottomInset;
-  canvas.setTextDatum(textdatum_t::bottom_left);
-  const std::string temperature = formatTemperatureText(data);
-  canvas.drawString(temperature.c_str(), kEnvironmentTextLeftX, bottomY);
-
-  if (!data.bottomCenterMessage.empty()) {
-    canvas.setTextDatum(textdatum_t::bottom_center);
-    canvas.drawString(data.bottomCenterMessage.c_str(), kCalendarCenterX, bottomY);
-  }
-
-  canvas.setTextDatum(textdatum_t::bottom_right);
-  const std::string humidity = formatHumidityText(data);
-  canvas.drawString(humidity.c_str(), kEnvironmentTextRightX, bottomY);
-}
 
 std::size_t utf8CodePointLength(unsigned char leadByte) {
   if ((leadByte & 0x80) == 0) {
@@ -292,44 +253,10 @@ int dynamicActionRowHeight(M5Canvas& canvas, const std::string& text) {
   return contentHeight > kTableFixedRowHeight ? contentHeight : kTableFixedRowHeight;
 }
 
-const char* chineseMonthName(int monthIndex) {
-  static constexpr const char* kMonths[] = {
-      "一月", "二月", "三月", "四月", "五月", "六月",
-      "七月", "八月", "九月", "十月", "十一月", "十二月"};
-  if (monthIndex < 0 || monthIndex >= 12) {
-    return kMonths[0];
-  }
-  return kMonths[monthIndex];
-}
-
-const char* weekdayName(int weekdayIndex) {
-  static constexpr const char* kWeekdays[] = {
-      "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
-  if (weekdayIndex < 0 || weekdayIndex >= 7) {
-    return kWeekdays[0];
-  }
-  return kWeekdays[weekdayIndex];
-}
-
-std::string formatYear(int year) {
-  char buffer[16] = {};
-  std::snprintf(buffer, sizeof(buffer), "%d 年", year);
-  return buffer;
-}
-
 std::string formatDay(int day) {
   char buffer[8] = {};
   std::snprintf(buffer, sizeof(buffer), "%d", day);
   return buffer;
-}
-
-std::tm fallbackLocalTime() {
-  std::tm local{};
-  local.tm_year = 1970 - 1900;
-  local.tm_mon = 0;
-  local.tm_mday = 1;
-  local.tm_wday = 4;
-  return local;
 }
 
 void applyMissingAlmanac(HomeCalendarData& data) {
@@ -491,20 +418,20 @@ void AlmanacView::render(const HomeCalendarData& data) {
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(themeColor, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.drawString(data.year.c_str(), kCalendarInsetX, kCalendarHeaderTopY);
+    canvas.drawString(data.year.c_str(), kViewInsetX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(data.month.c_str(), kCalendarCenterX, kCalendarHeaderTopY);
+    canvas.drawString(data.month.c_str(), kViewCenterX, kViewHeaderTopY);
 
     canvas.setTextDatum(textdatum_t::top_right);
-    canvas.drawString(data.weekday.c_str(), kCalendarRightX, kCalendarHeaderTopY);
+    canvas.drawString(data.weekday.c_str(), kViewRightX, kViewHeaderTopY);
     canvas.unloadFont();
   }
 
   if (canvas.loadFont(generated::kDeviceLargeDateFontVlw)) {
     canvas.setTextColor(themeColor, TFT_WHITE);
     canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(data.day.c_str(), kCalendarCenterX, kCalendarDayTopY);
+    canvas.drawString(data.day.c_str(), kViewCenterX, kCalendarDayTopY);
     canvas.unloadFont();
   }
 
@@ -516,8 +443,8 @@ void AlmanacView::render(const HomeCalendarData& data) {
     if (!data.solarTerm.empty()) {
       lunarLine += " " + data.solarTerm;
     }
-    canvas.drawString(lunarLine.c_str(), kCalendarCenterX, kCalendarLunarTopY);
-    canvas.drawString(data.ganzhi.c_str(), kCalendarCenterX, kCalendarGanzhiTopY);
+    canvas.drawString(lunarLine.c_str(), kViewCenterX, kCalendarLunarTopY);
+    canvas.drawString(data.ganzhi.c_str(), kViewCenterX, kCalendarGanzhiTopY);
 
     const int yiRowTop = kTableRow2BottomY;
     const int yiRowHeight = dynamicActionRowHeight(canvas, sortedYi);
@@ -536,7 +463,7 @@ void AlmanacView::render(const HomeCalendarData& data) {
     canvas.drawString(data.wuxing.c_str(), kTableTextLeftX, kTableRow1TextY);
 
     canvas.setTextDatum(textdatum_t::top_center);
-    canvas.drawString(data.chongsha.c_str(), kCalendarCenterX, kTableRow1TextY);
+    canvas.drawString(data.chongsha.c_str(), kViewCenterX, kTableRow1TextY);
 
     canvas.setTextDatum(textdatum_t::top_right);
     canvas.drawString(data.zhishen.c_str(), kTableTextRightX, kTableRow1TextY);
@@ -554,7 +481,9 @@ void AlmanacView::render(const HomeCalendarData& data) {
     canvas.drawString("忌", kTableTextLeftX, jiTextY);
     drawWrappedText(canvas, sortedJi, kTableContentLeftX, jiTextY, kTableContentWidth, kTableLineHeight, kMaxActionLines);
 
-    drawEnvironmentReadings(canvas, data);
+    drawBottomStatusBar(canvas, {data.temperatureAvailable, data.temperatureCelsius,
+                                  data.humidityAvailable, data.humidityPercent,
+                                  data.bottomCenterMessage});
 
     canvas.unloadFont();
   }

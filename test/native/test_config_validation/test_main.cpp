@@ -1,7 +1,7 @@
 #include <unity.h>
 
-#include "config_validator.h"
-#include "timezone_catalog.h"
+#include "config/config_validator.h"
+#include "providers/timezone_catalog.h"
 
 void test_empty_wifi_requires_manual_time() {
   homedeck::SetupConfig config{};

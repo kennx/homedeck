@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../support/almanac_fixture.h"
-#include "almanac_provider.h"
+#include "providers/almanac_provider.h"
 
 namespace {
 

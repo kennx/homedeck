@@ -1,16 +1,16 @@
-#include "calendar_view.h"
+#include "views/calendar_view.h"
 
 #include <M5Unified.h>
 #include <cstdio>
 #include <ctime>
 #include <string>
 
-#include "almanac_view.h"
-#include "almanac_provider.h"
+#include "views/almanac_view.h"
+#include "providers/almanac_provider.h"
 #include "generated/device_font_vlw.h"
-#include "render_context.h"
-#include "sht40_reader.h"
-#include "view_common.h"
+#include "system/render_context.h"
+#include "system/sht40_reader.h"
+#include "views/view_common.h"
 
 namespace homedeck {
 namespace {

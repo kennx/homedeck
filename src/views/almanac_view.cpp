@@ -1,4 +1,4 @@
-#include "almanac_view.h"
+#include "views/almanac_view.h"
 
 #include <M5Unified.h>
 #include <cstdio>
@@ -11,9 +11,9 @@
 #include <algorithm>
 
 #include "generated/device_font_vlw.h"
-#include "render_context.h"
-#include "sht40_reader.h"
-#include "view_common.h"
+#include "system/render_context.h"
+#include "system/sht40_reader.h"
+#include "views/view_common.h"
 
 namespace homedeck {
 namespace {

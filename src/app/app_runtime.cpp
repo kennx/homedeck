@@ -1,4 +1,4 @@
-#include "app_runtime.h"
+#include "app/app_runtime.h"
 
 #include <Arduino.h>
 #include <ESP.h>
@@ -23,17 +23,17 @@
 #include <memory>
 #include <string>
 
-#include "boot_controller.h"
-#include "config_portal.h"
-#include "config_store.h"
-#include "almanac_view.h"
-#include "calendar_view.h"
-#include "countdown_view.h"
-#include "home_renderer.h"
-#include "sht40_reader.h"
-#include "time_service.h"
-#include "timezone_catalog.h"
-#include "wifi_connection.h"
+#include "app/boot_controller.h"
+#include "config/config_portal.h"
+#include "config/config_store.h"
+#include "views/almanac_view.h"
+#include "views/calendar_view.h"
+#include "views/countdown_view.h"
+#include "views/home_renderer.h"
+#include "system/sht40_reader.h"
+#include "system/time_service.h"
+#include "providers/timezone_catalog.h"
+#include "system/wifi_connection.h"
 
 namespace homedeck {
 

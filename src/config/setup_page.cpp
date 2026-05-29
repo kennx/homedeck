@@ -1,9 +1,9 @@
-#include "setup_page.h"
+#include "config/setup_page.h"
 
 #include <algorithm>
 #include <sstream>
 
-#include "timezone_catalog.h"
+#include "providers/timezone_catalog.h"
 
 namespace homedeck {
 

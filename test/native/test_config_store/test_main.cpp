@@ -2,7 +2,7 @@
 
 #include <Preferences.h>
 
-#include "config_store.h"
+#include "config/config_store.h"
 
 void setUp() {
   fakePreferencesReset();

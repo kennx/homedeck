@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "config_types.h"
+#include "config/config_types.h"
 
 namespace homedeck {
 

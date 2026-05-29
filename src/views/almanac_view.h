@@ -3,7 +3,7 @@
 #include <ctime>
 #include <string>
 
-#include "almanac_provider.h"
+#include "providers/almanac_provider.h"
 
 namespace homedeck {
 

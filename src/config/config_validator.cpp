@@ -1,8 +1,8 @@
-#include "config_validator.h"
+#include "config/config_validator.h"
 
 #include <cstdio>
 
-#include "timezone_catalog.h"
+#include "providers/timezone_catalog.h"
 
 namespace homedeck {
 namespace {

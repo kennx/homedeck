@@ -1,6 +1,6 @@
 #include <unity.h>
 
-#include "countdown_view.h"
+#include "views/countdown_view.h"
 
 using namespace homedeck;
 

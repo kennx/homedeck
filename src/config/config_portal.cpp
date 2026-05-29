@@ -1,11 +1,11 @@
-#include "config_portal.h"
+#include "config/config_portal.h"
 
 #include <Arduino.h>
 #include <ESP.h>
 #include <WiFi.h>
 
-#include "config_validator.h"
-#include "setup_page.h"
+#include "config/config_validator.h"
+#include "config/setup_page.h"
 
 namespace homedeck {
 

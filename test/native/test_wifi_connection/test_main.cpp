@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-#include "wifi_connection.h"
+#include "system/wifi_connection.h"
 
 void setUp() {
   fakeArduinoResetClock();

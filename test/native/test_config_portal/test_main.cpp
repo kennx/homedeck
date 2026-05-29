@@ -5,7 +5,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
-#include "config_portal.h"
+#include "config/config_portal.h"
 
 namespace {
 

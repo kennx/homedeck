@@ -1,4 +1,4 @@
-#include "sht40_reader.h"
+#include "system/sht40_reader.h"
 
 #include <Arduino.h>
 #include <M5Unified.h>

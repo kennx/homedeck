@@ -1,10 +1,10 @@
-#include "time_service.h"
+#include "system/time_service.h"
 
 #include <cstdlib>
 #include <cstring>
 #include <utility>
 
-#include "timezone_catalog.h"
+#include "providers/timezone_catalog.h"
 
 namespace homedeck {
 namespace {

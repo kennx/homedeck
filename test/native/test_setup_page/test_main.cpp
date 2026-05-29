@@ -1,6 +1,6 @@
 #include <unity.h>
 
-#include "setup_page.h"
+#include "config/setup_page.h"
 
 void test_select_top_five_wifi_networks_by_rssi() {
   std::vector<homedeck::WifiNetwork> networks = {

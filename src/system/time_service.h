@@ -4,7 +4,7 @@
 #include <functional>
 #include <string>
 
-#include "config_types.h"
+#include "config/config_types.h"
 
 namespace homedeck {
 

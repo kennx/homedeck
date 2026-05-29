@@ -13,8 +13,8 @@
 #include <cstdlib>
 #include <cstdint>
 
-#include "app_runtime.h"
-#include "boot_controller.h"
+#include "app/app_runtime.h"
+#include "app/boot_controller.h"
 
 namespace homedeck {
 extern SystemView gRtcSavedView;

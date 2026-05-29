@@ -3,7 +3,7 @@
 #include <ctime>
 #include <string>
 
-#include "boot_controller.h"
+#include "app/boot_controller.h"
 
 namespace homedeck {
 

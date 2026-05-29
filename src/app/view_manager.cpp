@@ -1,4 +1,4 @@
-#include "view_manager.h"
+#include "app/view_manager.h"
 
 namespace homedeck {
 

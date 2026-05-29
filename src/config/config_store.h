@@ -2,8 +2,8 @@
 
 #include <Preferences.h>
 
-#include "boot_controller.h"
-#include "config_types.h"
+#include "app/boot_controller.h"
+#include "config/config_types.h"
 
 namespace homedeck {
 

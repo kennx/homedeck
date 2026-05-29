@@ -1,4 +1,4 @@
-#include "home_renderer.h"
+#include "views/home_renderer.h"
 
 #include <LittleFS.h>
 #include <M5Unified.h>
@@ -8,10 +8,10 @@
 #include <vector>
 #include <cstdint>
 
-#include "almanac_view.h"
-#include "calendar_view.h"
+#include "views/almanac_view.h"
+#include "views/calendar_view.h"
 #include "generated/device_font_vlw.h"
-#include "render_context.h"
+#include "system/render_context.h"
 
 namespace homedeck {
 namespace {

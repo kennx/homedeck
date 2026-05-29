@@ -8,7 +8,7 @@
 #include <cmath>
 #include <cstdint>
 
-#include "sht40_reader.h"
+#include "system/sht40_reader.h"
 
 namespace {
 

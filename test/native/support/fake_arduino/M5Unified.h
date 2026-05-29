@@ -31,8 +31,7 @@ enum class FakeFontKind {
   kChinese = 1,
   kDeviceDefault = 2,
   kDeviceMetric = 3,
-  kDeviceTime = 4,
-  kConfigPortal = 5,
+  kConfigPortal = 4,
   kDeviceLargeDate = 6,
 };
 
@@ -345,9 +344,6 @@ struct FakeDisplay {
     if (kind == FakeFontKind::kDeviceMetric) {
       return 28;
     }
-    if (kind == FakeFontKind::kDeviceTime) {
-      return 42;
-    }
     if (kind == FakeFontKind::kDeviceLargeDate) {
       return 78;
     }
@@ -441,10 +437,6 @@ struct FakeDisplay {
       return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 14 : 28;
     }
 
-    if (kind == FakeFontKind::kDeviceTime) {
-      return leadByte < 0x80 || (leadByte & 0xE0) == 0xC0 ? 21 : 42;
-    }
-
     if (kind == FakeFontKind::kDeviceLargeDate) {
       return 39;
     }
@@ -469,8 +461,6 @@ struct FakeDisplay {
       fontKind = FakeFontKind::kDeviceLargeDate;
     } else if (font == homedeck::generated::kDeviceMetricFontVlw) {
       fontKind = FakeFontKind::kDeviceMetric;
-    } else if (font == homedeck::generated::kDeviceTimeFontVlw) {
-      fontKind = FakeFontKind::kDeviceTime;
     } else if (font == homedeck::generated::kDeviceFontVlw) {
       fontKind = FakeFontKind::kDeviceDefault;
     } else {
@@ -513,6 +503,21 @@ struct FakeDisplay {
       }
     }
     return width;
+  }
+
+  int fontHeight() const {
+    return lineHeightFor(fontKind) * textSize;
+  }
+
+  void getTextBounds(const char* text, int16_t, int16_t,
+                     int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
+    if (text == nullptr || x1 == nullptr || y1 == nullptr || w == nullptr || h == nullptr) {
+      return;
+    }
+    *w = textWidth(text);
+    *h = lineHeightFor(fontKind) * textSize;
+    *x1 = 0;
+    *y1 = -*h;
   }
 
   void drawRect(int x, int y, int w, int h, std::uint32_t color) {
@@ -716,6 +721,21 @@ struct FakeCanvas {
       }
     }
     return width;
+  }
+
+  int fontHeight() const {
+    return FakeDisplay::lineHeightFor(fontKind) * textSize;
+  }
+
+  void getTextBounds(const char* text, int16_t, int16_t,
+                     int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) {
+    if (text == nullptr || x1 == nullptr || y1 == nullptr || w == nullptr || h == nullptr) {
+      return;
+    }
+    *w = textWidth(text);
+    *h = FakeDisplay::lineHeightFor(fontKind) * textSize;
+    *x1 = 0;
+    *y1 = -*h;
   }
 
   void drawRect(int x, int y, int w, int h, std::uint32_t color) {

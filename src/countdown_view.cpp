@@ -75,7 +75,6 @@ CountdownData makeCurrentCountdownData() {
 
 void CountdownView::render() {
   CountdownData data = makeCurrentCountdownData();
-  data.bottomCenterMessage = formatCurrentTimeHHMM();
   render(data);
 }
 
@@ -84,38 +83,36 @@ void CountdownView::render(const CountdownData& data) {
   prepareScreen(canvas);
 
   const int centerX = canvas.width() / 2;
+  const int centerY = canvas.height() / 2;
+
+  // 大日期字体实际渲染高度约为 pixelSize * 13/16（VLW glyph 分析得出 127px），
+  // 取一半作为文本垂直半高，确保上下各 12px 间距。
+  constexpr int kDaysFontHalfHeight =
+      static_cast<int>(generated::kDeviceLargeDateFontPixelSize * 13 / 32);
+
+  // 第二行：大数字天数（先绘制，避免覆盖其他元素）
+  if (canvas.loadFont(generated::kDeviceLargeDateFontVlw)) {
+    canvas.setTextColor(kThemeColor, kBgColor);
+    canvas.setTextDatum(textdatum_t::middle_center);
+    canvas.drawString(std::to_string(data.daysRemaining).c_str(), centerX, centerY);
+    canvas.unloadFont();
+  }
 
   // 第一行：描述文字 "距离 2027 年还有"
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(kThemeColor, kBgColor);
-    canvas.setTextDatum(textdatum_t::top_center);
+    canvas.setTextDatum(textdatum_t::bottom_center);
     char desc[32] = {};
     std::snprintf(desc, sizeof(desc), "距离 %d 年还有", data.nextYear);
-    canvas.drawString(desc, centerX, 40);
-    canvas.unloadFont();
-  }
-
-  // 第二行：大数字天数
-  if (canvas.loadFont(generated::kDeviceLargeDateFontVlw)) {
-    canvas.setTextColor(kThemeColor, kBgColor);
-    canvas.setTextDatum(textdatum_t::middle_center);
-    canvas.drawString(std::to_string(data.daysRemaining).c_str(), centerX, canvas.height() / 2 - 10);
+    canvas.drawString(desc, centerX, centerY - kDaysFontHalfHeight - 12);
     canvas.unloadFont();
   }
 
   // 第三行：单位 "天"
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(kThemeColor, kBgColor);
-    canvas.setTextDatum(textdatum_t::bottom_center);
-    canvas.drawString("天", centerX, canvas.height() - 80);
-    canvas.unloadFont();
-  }
-
-  // 底部状态栏：当前时间
-  if (canvas.loadFont(generated::kDeviceTimeFontVlw)) {
-    canvas.setTextColor(kThemeColor, kBgColor);
-    canvas.setTextDatum(textdatum_t::bottom_center);
-    canvas.drawString(data.bottomCenterMessage.c_str(), centerX, canvas.height() - 20);
+    canvas.setTextDatum(textdatum_t::top_center);
+    canvas.drawString("天", centerX, centerY + kDaysFontHalfHeight + 12);
     canvas.unloadFont();
   }
 
@@ -124,7 +121,6 @@ void CountdownView::render(const CountdownData& data) {
 
 void CountdownView::renderSleep() {
   CountdownData data = makeCurrentCountdownData();
-  data.bottomCenterMessage = "--:--";
   render(data);
 }
 

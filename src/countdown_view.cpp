@@ -5,7 +5,6 @@
 
 #include "generated/device_font_vlw.h"
 #include "render_context.h"
-#include "sht40_reader.h"
 
 namespace homedeck {
 
@@ -57,10 +56,12 @@ CountdownData makeCountdownData(const std::tm& localTime) {
 
 CountdownData makeCurrentCountdownData() {
   const std::time_t now = std::time(nullptr);
-  const std::tm* local = now > 0 ? std::localtime(&now) : nullptr;
+  std::tm buf{};
+  std::tm* local = now > 0 ? localtime_r(&now, &buf) : nullptr;
   if (local == nullptr) {
     std::tm fallback{};
-    fallback.tm_year = 126;  // 2026
+    // 设备时钟完全失效时的降级显示，固定为 2026-01-01
+    fallback.tm_year = 126;
     fallback.tm_mon = 0;
     fallback.tm_mday = 1;
     fallback.tm_hour = 0;
@@ -88,7 +89,7 @@ void CountdownView::render(const CountdownData& data) {
   if (canvas.loadFont(generated::kDeviceFontVlw)) {
     canvas.setTextColor(kThemeColor, kBgColor);
     canvas.setTextDatum(textdatum_t::top_center);
-    char desc[64] = {};
+    char desc[32] = {};
     std::snprintf(desc, sizeof(desc), "距离 %d 年还有", data.nextYear);
     canvas.drawString(desc, centerX, 40);
     canvas.unloadFont();

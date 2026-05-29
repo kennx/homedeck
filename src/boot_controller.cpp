@@ -92,6 +92,7 @@ void BootController::update() {
           deps_.renderAlmanacWithOffset(0);
         }
       }
+      // CountdownView 无偏移状态，双击无需重置
       lastActivityMs_ = now;
     }
   }

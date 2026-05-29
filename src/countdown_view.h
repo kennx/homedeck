@@ -11,6 +11,11 @@ struct CountdownData {
   int daysRemaining = 0;
   int month = 0;     // 1-12
   int weekday = 0;   // 0=周日
+  bool temperatureAvailable = false;
+  float temperatureCelsius = 0.0f;
+  bool humidityAvailable = false;
+  float humidityPercent = 0.0f;
+  std::string bottomCenterMessage;
 };
 
 CountdownData makeCountdownData(const std::tm& localTime);

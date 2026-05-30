@@ -23,7 +23,7 @@ src/
 test/native/          # 单元测试（Unity），每个被测模块对应一个 test_<module>/
 tools/                # 构建时 Python 脚本（字体/老黄历数据生成）
 data/                 # 运行时资源（logo.png、almanac.bin），打包到 LittleFS
-docs/                 # 产品文档和开发记录
+docs/                 # 产品文档和开发记录 — 硬件信息见 [docs/PaperColor.md](docs/PaperColor.md)
 fonts/                # 字体源文件，经 tools/ 生成 src/generated/
 ```
 
